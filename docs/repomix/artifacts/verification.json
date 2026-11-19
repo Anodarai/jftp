@@ -1,11 +1,15 @@
 {
   "repomix_version": "1.18.1",
-  "revision": "14e62ceba4e371c2a0b955604b10f065f46f4f7d",
-  "packed_files": 184,
-  "bytes": 907017,
+  "revision": "a15ac14a8862002207d9737d7f6c2635c3f3a438",
+  "working_tree_additions": [
+    "docs/jftp-runtime-resources.md"
+  ],
+  "packed_files": 187,
+  "bytes": 910959,
   "token_encoding": "o200k_base",
-  "reported_tokens": 231240,
-  "output_sha256": "cf7921b4da742cf484ea61cfa78536d116004221c407ae22eca1bf6ab429386c",
-  "config_sha256": "5160138c28d954d8c7138c2641c447c934d16712e984f1302d68441d3d55bc70",
-  "source_manifest_sha256": "bb4473e6465c928cd62f2c76e310f4809d983adeef01c160c95dd570dbfd02ae"
+  "reported_tokens": 232466,
+  "output_sha256": "450ebf6ce151f12c16873819149a8bf1ae02c6b8c094c40211fc8940e8183953",
+  "config_sha256": "4f8c184bb8331c8cb9bf734c446a96b9d78a00ebff5283f022568b10121e4a5b",
+  "source_manifest": "source-sha256.full.json",
+  "source_manifest_sha256": "e788c682f873f32dd80a9b579bbf56608fa58f118a79210e96b513d3e066ceb8"
 }

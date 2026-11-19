@@ -1,6 +1,7 @@
 /jftp.xml -text
 /artifacts/repomix.config.json -text
 /artifacts/source-sha256.json -text
+/artifacts/source-sha256.full.json -text
 /jftp.compressed.xml -text
 /artifacts/repomix.compressed.config.json -text
 /artifacts/jftp-preferences-comment-filter.mjs -text

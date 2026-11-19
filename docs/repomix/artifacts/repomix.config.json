@@ -1,9 +1,23 @@
 {
-  "include": ["src/main/java/**/*.java", "pom.xml", "src/main/assembly/binary.xml"],
+  "include": [
+    "src/main/java/**/*.java",
+    "pom.xml",
+    "src/main/assembly/binary.xml",
+    "src/main/scripts/jftp.bat",
+    "src/main/scripts/jftp.sh",
+    "docs/jftp-runtime-resources.md"
+  ],
   "ignore": {
     "useGitignore": true,
     "useDefaultPatterns": true,
-    "customPatterns": ["docs/repo-maps/**", "docs/repomix/**", "**/.env", "**/.env.*", "**/*.key", "**/*.keystore"]
+    "customPatterns": [
+      "docs/repo-maps/**",
+      "docs/repomix/**",
+      "**/.env",
+      "**/.env.*",
+      "**/*.key",
+      "**/*.keystore"
+    ]
   },
   "output": {
     "style": "xml",
@@ -13,6 +27,10 @@
     "removeEmptyLines": false,
     "showLineNumbers": false
   },
-  "security": {"enableSecurityCheck": true},
-  "tokenCount": {"encoding": "o200k_base"}
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
 }
