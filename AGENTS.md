@@ -8,7 +8,7 @@ Write chat responses and repository documentation in English. Put desktop UI str
 
 Treat existing preferences, saved sites, and certificate stores as compatibility inputs. Keep localized resources, icons, and JavaHelp available on the packaged classpath. JavaHelp initializes during window startup.
 
-The [desktop modernization ADR](docs/ADR/000-main-architecture.md) links to the PRD and accepted decisions. Baseline and package qualification run on Windows.
+Start with the [engineering documentation](docs/README.md) for architecture, operating instructions, the PRD and accepted ADRs. Baseline and package qualification run on Windows.
 
 ## RepoMap
 
@@ -75,4 +75,4 @@ Create a local commit for each logical change.
 
 Complete only with agreed behavior, honest verification, required QA evidence and a reviewable result. Investigate failures/new warnings; report blockers.
 
-Update affected repository instructions and documentation in the same logical change whenever enduring project facts or policies change.
+During modernization, review this root file and the affected nested AGENTS.md files in every logical change. Update the relevant instructions and engineering documentation in that same commit whenever structure, entry points, compatibility constraints or verification practices change. Keep CLAUDE.md as an import of its local AGENTS.md.
