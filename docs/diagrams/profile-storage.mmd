@@ -1,0 +1,27 @@
+flowchart LR
+    Startup["Startup, preferences<br/>dialog and exit"]
+    FavoritesUI["Favorites dialog<br/>and save-site action"]
+    TLS["FTPS key and trust managers<br/>and certificate manager dialog"]
+    Prefs["JFTP<br/>loadPreferences / savePreferences"]
+    Favorites["FavoritesManager"]
+    Store["KeyStoreManager"]
+
+    subgraph Data["Default profile directory under user.home/.jftp/data"]
+        PrefsFile["preferences.ser<br/>Serialized JFTPPreferences"]
+        FavFile["favorites.ser<br/>Serialized list or SealedObject"]
+        Certs["serverCertificates.jks<br/>clientCertificates.jks"]
+    end
+
+    Startup --> Prefs
+    FavoritesUI --> Favorites
+    TLS --> Store
+    Prefs <-->|"Read and write"| PrefsFile
+    Favorites <-->|"Read and write"| FavFile
+    Prefs -. "Configured store locations" .-> Store
+    Store <-->|"Load and save JKS"| Certs
+
+    classDef app fill:#e8f2ff,stroke:#345d87,color:#14263c
+    classDef file fill:#edf5ed,stroke:#47764d,color:#192c1c
+    class Startup,FavoritesUI,TLS,Prefs,Favorites,Store app
+    class PrefsFile,FavFile,Certs file
+    style Data fill:#f5f8fc,stroke:#8b9bad,color:#14263c

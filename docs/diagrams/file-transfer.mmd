@@ -1,0 +1,31 @@
+flowchart TD
+    Request(["Upload or Download action on the selected tab"])
+    Ready{"Connected with<br/>a selection?"}
+    Return(["Return"])
+    Start["Clear abort flag, set busy<br/>and start transfer worker"]
+    More{"More items, connected,<br/>and abort flag clear?"}
+    Item{"Item type"}
+    File["Choose transfer type<br/>and call FTPClient.upload or download"]
+    Directory["Create destination directory<br/>and recurse over filtered children"]
+    Next["Advance to next item"]
+    List["Read destination listing<br/>Remote for upload, local for download"]
+    Finish(["On worker return, update destination pane<br/>and clear busy in finished() on the EDT"])
+
+    Request --> Ready
+    Ready -->|"No"| Return
+    Ready -->|"Yes"| Start
+    Start --> More
+    More -->|"Yes"| Item
+    Item -->|"File"| File
+    Item -->|"Directory"| Directory
+    Item -->|"Other"| Next
+    File --> Next
+    Directory --> Next
+    Next --> More
+    More -->|"No"| List
+    List --> Finish
+
+    classDef action fill:#e8f2ff,stroke:#345d87,color:#14263c
+    classDef branch fill:#fff3d9,stroke:#876322,color:#3b2a0e
+    class Request,Return,Start,File,Directory,Next,List,Finish action
+    class Ready,More,Item branch

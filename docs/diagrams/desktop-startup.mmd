@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant JVM as Java launcher
+    participant App as JFTPApplication
+    participant Window as JFTP
+    participant Disk as Local preferences
+    participant Help as JFTPHelp2
+    participant Tab as FTPSession
+
+    JVM->>App: Invoke main on startup thread
+    App->>Window: First read of JFTP.prefs triggers class initialization
+    Window->>Disk: Load preferences.ser, creating defaults if missing
+    Window->>Window: Load transfer types and apply proxy settings
+    App->>App: Apply locale and attempt look and feel
+    App->>Window: Construct the main Swing window
+    Window->>Window: Load text and icon, then build menus
+    Window->>Help: Initialize help while building HelpMenu
+    Help->>Help: Load helpset/helpSet.xml and create HelpBroker
+    Window->>Window: Build tab pane and toolbar
+    App->>Window: setVisible(true)
+    App->>Window: newSession()
+    Window->>Tab: Create panes and choose the local directory
+    Window->>Window: Add and select disconnected tab

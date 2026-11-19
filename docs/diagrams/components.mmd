@@ -1,0 +1,32 @@
+flowchart TD
+    User(["Desktop user"])
+    subgraph JVM["JFTP desktop JVM"]
+        App["JFTPApplication<br/>Desktop entry point"]
+        Window["JFTP<br/>Swing window, menus and toolbar"]
+        Session["FTPSession<br/>One per tab"]
+        Panes["LocalPane, RemotePane<br/>StatusWindow and StatusBar"]
+        Help["JFTPHelp2<br/>JavaHelp and classpath resources"]
+        Worker["SwingWorker<br/>Background operations"]
+        Client["ftpapi library<br/>FTPClient and ListParser"]
+        Profile["Preferences, favorites<br/>and certificate storage"]
+    end
+    Server["FTP or FTPS server"]
+    Disk["Local filesystem"]
+
+    User --> Window
+    App --> Window
+    Window -->|"Creates and selects"| Session
+    Window --> Help
+    Window --> Profile
+    Session -->|"Calls"| Client
+    Session -->|"Owns"| Panes
+    Session -->|"Starts"| Worker
+    Session -->|"Local listings and transfers"| Disk
+    Client -->|"FTP or FTPS"| Server
+    Profile -->|"Reads and writes user data"| Disk
+
+    classDef app fill:#e8f2ff,stroke:#345d87,color:#14263c
+    classDef external fill:#edf5ed,stroke:#47764d,color:#192c1c
+    class App,Window,Session,Panes,Help,Worker,Client,Profile app
+    class User,Disk,Server external
+    style JVM fill:#f5f8fc,stroke:#8b9bad,color:#14263c

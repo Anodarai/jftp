@@ -1,0 +1,35 @@
+sequenceDiagram
+    participant Action as ConnectAction (EDT)
+    participant Tab as FTPSession (EDT)
+    participant Worker as Connect worker
+    participant FTP as ftpapi FTPClient
+
+    Action->>Action: Open ConnectionDlg for the selected tab
+    opt Dialog supplies a RemoteHost
+        Action->>Tab: connect(remoteHost)
+        Tab->>Tab: Store host and mark tab busy
+        Tab--)Worker: Start background thread
+        Worker->>Worker: Load client and parser by class name
+        Worker->>FTP: Set parser, modes, timeout and buffer
+        opt Security mode uses SSL
+            Worker->>FTP: Attach JFTP SSL context
+        end
+        Worker->>FTP: Register session listeners
+        Worker->>FTP: Connect on the selected port, then log in
+        alt Connect and login return normally
+            Worker->>FTP: Execute startup commands in order
+            opt Initial remote directory is set
+                Worker->>FTP: Set remote working directory
+            end
+            Worker->>FTP: Read working directory and filtered listing
+        else Connect or login throws FTPException
+            Worker->>Worker: Log the error
+            Worker->>FTP: Disconnect client
+            Worker->>Worker: Clear client if disconnect returns
+        end
+        Worker--)Tab: Post finished() via invokeLater on return
+        opt Client connected
+            Tab->>Tab: Update remote pane and title
+        end
+        Tab->>Tab: Reset status and busy state, then apply initial local path
+    end
