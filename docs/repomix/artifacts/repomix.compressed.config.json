@@ -1,0 +1,43 @@
+{
+  "include": [
+    "src/main/java/**/*.java",
+    "pom.xml",
+    "src/main/assembly/binary.xml"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "docs/repo-maps/**",
+      "docs/repomix/**",
+      "**/.env",
+      "**/.env.*",
+      "**/*.key",
+      "**/*.keystore"
+    ]
+  },
+  "output": {
+    "style": "xml",
+    "parsableStyle": true,
+    "compress": true,
+    "removeComments": true,
+    "removeEmptyLines": false,
+    "showLineNumbers": false
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  },
+  "input": {
+    "processors": [
+      {
+        "pattern": "src/main/java/com/myjavaworld/jftp/JFTPPreferences.java",
+        "command": "node docs/repomix/artifacts/jftp-preferences-comment-filter.mjs {file}",
+        "timeout": 30000,
+        "onError": "fail"
+      }
+    ]
+  }
+}

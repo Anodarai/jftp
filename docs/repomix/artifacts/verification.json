@@ -1,0 +1,11 @@
+{
+  "repomix_version": "1.18.1",
+  "revision": "14e62ceba4e371c2a0b955604b10f065f46f4f7d",
+  "packed_files": 184,
+  "bytes": 907017,
+  "token_encoding": "o200k_base",
+  "reported_tokens": 231240,
+  "output_sha256": "cf7921b4da742cf484ea61cfa78536d116004221c407ae22eca1bf6ab429386c",
+  "config_sha256": "5160138c28d954d8c7138c2641c447c934d16712e984f1302d68441d3d55bc70",
+  "source_manifest_sha256": "bb4473e6465c928cd62f2c76e310f4809d983adeef01c160c95dd570dbfd02ae"
+}

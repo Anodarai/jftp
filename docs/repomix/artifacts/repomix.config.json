@@ -1,0 +1,18 @@
+{
+  "include": ["src/main/java/**/*.java", "pom.xml", "src/main/assembly/binary.xml"],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": ["docs/repo-maps/**", "docs/repomix/**", "**/.env", "**/.env.*", "**/*.key", "**/*.keystore"]
+  },
+  "output": {
+    "style": "xml",
+    "parsableStyle": true,
+    "compress": false,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "showLineNumbers": false
+  },
+  "security": {"enableSecurityCheck": true},
+  "tokenCount": {"encoding": "o200k_base"}
+}
