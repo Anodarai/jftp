@@ -37,7 +37,7 @@ The application remains a single desktop process and Maven project. The current 
 | User data | Local profiles, with a compatibility reader and recoverable migration. See [storage ADR](002-profile-storage-and-migration.md). |
 | Tests | JUnit 6.1.3, controlled local FTP/FTPS endpoints, and automated native Swing UI flows on Windows. |
 
-The current POM targets Java 5, declares FTP and help libraries, and packages localization, icons, and JavaHelp resources. The JavaHelp menu initializes during window construction. These assets are part of the packaged startup contract. The current Assembly descriptor puts the app JAR at the package root and dependencies under `lib/`, while the existing Windows launcher looks for the app JAR under `lib/`. Verify the legacy archive if available. Align the target layout and launcher, and verify the actual ZIP. Audit the applet and legacy macOS sources during the JDK 25 build probe. If one blocks the Windows build, isolate it from the Windows compilation inputs after checking references to the active desktop entry point. [POM](../../pom.xml#L84) · [Assembly](../../src/main/assembly/binary.xml#L12) · [Windows launcher](../../src/main/scripts/jftp.bat#L1) · [Runtime resource index](../jftp-runtime-resources.md)
+At the source baseline the POM targeted Java 5. The [baseline test build](../testing.md) compiles for Java 8 on the Windows probe JDK and excludes the unused Apple-specific adapter. The POM declares the FTP and help libraries and packages localization, icons, and JavaHelp resources. The JavaHelp menu initializes during window construction. These assets are part of the packaged startup contract. The current Assembly descriptor puts the app JAR at the package root and dependencies under `lib/`, while the existing Windows launcher looks for the app JAR under `lib/`. Align the target layout and launcher, and verify the actual ZIP. [POM](../../pom.xml) · [Assembly](../../src/main/assembly/binary.xml#L12) · [Windows launcher](../../src/main/scripts/jftp.bat#L1) · [Runtime resource index](../jftp-runtime-resources.md)
 
 ## 4. Module Structure and Dependencies
 
@@ -88,7 +88,7 @@ Profile verification uses an isolated Windows user or a temporary user home sele
 
 **Status:** Accepted  
 **Date:** 2026-11-19  
-**Context:** Source and PRD describe important workflows, but the repository has no runnable automated test suite and the shipped launcher layout is uncertain.  
+**Context:** At the source baseline, the repository had no runnable automated test suite and the shipped launcher layout was uncertain.\
 **Decision:** Build a runnable baseline and add characterization tests before refactoring. Keep the single Swing application and JavaHelp startup contract.  
 **Rejected alternatives:** A rewrite would change too many observations at once. Replacing both the transport and packaging immediately would make failures hard to attribute.  
 **Consequences:** Requires an initial recovery and evidence step. Later changes can be evaluated against the same profiles, scripts, and endpoints.  

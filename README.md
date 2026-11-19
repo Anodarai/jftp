@@ -21,6 +21,7 @@ platforms such as Windows, Mac OS X, Linux, Solaris, HP-UX, OS/2, UNIX or any
 other platform with a compatible JVM (Java Virtual Machine). 
 
 See the [desktop architecture diagrams](docs/architecture.md) for the current implementation.
+Run the Windows baseline suite with `mvn test`. See [test coverage and verification](docs/testing.md) for setup and scope.
 
 Features
 --------
