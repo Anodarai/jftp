@@ -25,3 +25,7 @@ Incorrect FTP credentials returned reply 530. A bound loopback port with no list
 | CONNECT refused after successful proxy authentication | The proxy returned reply 5 and the client stayed disconnected |
 
 Run `mvnw.cmd -Dtest=LegacySocksTest test` to repeat the three cases.
+
+## Certificate decision
+
+The extracted Windows desktop smoke connected to a real explicit FTPS listener using an untrusted, valid loopback certificate. The Security Warning identified the unknown issuer. No caused a handshake failure and left the tab disconnected. A new connection showed the warning again. Yes allowed login and the protected `/incoming` listing. The initialized server trust store remained empty after No and its bytes were identical after Yes. The same scenarios passed with the recovered package. [Desktop smoke](testing.md#automated-windows-desktop-smoke)

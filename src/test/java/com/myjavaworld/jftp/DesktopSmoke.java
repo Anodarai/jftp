@@ -14,6 +14,7 @@ import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -38,11 +39,15 @@ import javax.swing.JTextField;
 import javax.swing.RootPaneContainer;
 import javax.swing.SwingUtilities;
 
+import com.myjavaworld.ftp.FTPConstants;
+import com.myjavaworld.jftp.ssl.SecurityWarningDlg;
+
 final class DesktopSmoke {
     private static final String GOOD_PASSWORD = "synthetic-ftp-password";
     private static final String BAD_PASSWORD = "invalid-desktop-smoke-password";
     private static final String WORKING_SITE = "Loopback FTP";
     private static final String REJECTED_SITE = "Rejected login";
+    private static final String TLS_SITE = "Loopback FTPS";
     private JFTP window;
 
     public static void main(String[] args) throws Exception {
@@ -68,17 +73,24 @@ final class DesktopSmoke {
         Path local = Files.createDirectory(root.resolve("local files"));
         Path upload = Files.write(local.resolve("upload.bin"), new byte[] {0, 13, 10, -1, 26, 42});
         Path incoming = root.resolve("server/incoming");
-        try (LegacyFtpTest.LoopbackServer server = LegacyFtpTest.startServer(root)) {
+        Path tlsRoot = Files.createDirectory(root.resolve("FTPS"));
+        LoopbackCertificate certificate = new LoopbackCertificate(tlsRoot);
+        try (LegacyFtpTest.LoopbackServer server = LegacyFtpTest.startServer(root);
+                LegacyFtpTest.LoopbackServer tls = LegacyFtpTest.startServer(tlsRoot,
+                        certificate.serverConfiguration(), false)) {
             Path remoteDownload = Files.write(incoming.resolve("download.bin"), new byte[] {42, -1, 13, 10, 0});
+            Files.write(tlsRoot.resolve("server/incoming/tls-fixture.bin"), new byte[] {8, 9});
             JFTPPreferences preferences = JFTP.prefs;
             preferences.setLocale(Locale.ENGLISH);
             preferences.setLocalDirectory(local.toString());
             preferences.setWindowBounds(new Rectangle(80, 70, 1000, 640));
             preferences.setCheckForUpdates(false);
             JFTP.savePreferences(preferences);
+            Favorite secure = favorite(TLS_SITE, tls.port, GOOD_PASSWORD);
+            secure.setSSLUsage(FTPConstants.USE_EXPLICIT_SSL);
             FavoritesManager.saveFavorites(new ArrayList<>(List.of(
                     favorite(REJECTED_SITE, server.port, BAD_PASSWORD),
-                    favorite(WORKING_SITE, server.port, GOOD_PASSWORD))));
+                    favorite(WORKING_SITE, server.port, GOOD_PASSWORD), secure)));
 
             JFTPApplication.main(new String[0]);
             window = await("one packaged JFTP window", () -> showingWindow(JFTP.class, ignored -> true));
@@ -89,6 +101,7 @@ final class DesktopSmoke {
             checkHelp();
             checkValidation();
             checkRejectedLogin(tabs);
+            checkCertificateDecision(tabs);
 
             connectFavorite(WORKING_SITE);
             JTable localTable = paneTable(LocalPane.class);
@@ -157,6 +170,38 @@ final class DesktopSmoke {
         connectFavorite(REJECTED_SITE);
         await("reply 530 and a disconnected tab",
                 () -> sessionLog().contains("530 ") && disconnected(tabs) ? tabs : null);
+    }
+
+    private void checkCertificateDecision(JTabbedPane tabs) throws Exception {
+        Path trustStore = Path.of(JFTP.prefs.getServerCertificateStore());
+        require(Files.notExists(trustStore), "The FTPS fixture must start with an empty server trust store");
+        connectFavorite(TLS_SITE);
+        SecurityWarningDlg warning = awaitCertificateWarning();
+        clickButton(warning, "No");
+        await("the declined certificate leaves the tab disconnected", () -> {
+            FTPSession session = window.getCurrentSession();
+            return !session.isBusy() && disconnected(tabs) && sessionLog().contains("No trusted certificate found")
+                    ? session : null;
+        });
+        byte[] emptyTrustStore = Files.readAllBytes(trustStore);
+        require(KeyStore.getInstance(trustStore.toFile(), JFTP.prefs.getServerCertificateStorePassword()).size() == 0,
+                "Declining the connection must leave the initialized server trust store empty");
+
+        connectFavorite(TLS_SITE);
+        clickButton(awaitCertificateWarning(), "Yes");
+        JTable table = paneTable(RemotePane.class);
+        await("the FTPS listing after continuing", () -> tableRow(table, "tls-fixture.bin") >= 0 ? table : null);
+        keys(window, KeyEvent.VK_F4);
+        await("the FTPS tab disconnected", () -> disconnected(tabs) && table.getRowCount() == 0 ? tabs : null);
+        require(Arrays.equals(emptyTrustStore, Files.readAllBytes(trustStore)),
+                "Continuing this connection persisted a trust exception");
+    }
+
+    private static SecurityWarningDlg awaitCertificateWarning() throws Exception {
+        return await("the untrusted loopback certificate warning",
+                () -> showingWindow(SecurityWarningDlg.class, warning -> components(warning)
+                        .anyMatch(component -> component instanceof JLabel label && label.getText() != null
+                                && label.getText().contains("certificate authority that you do not"))));
     }
 
     private void connectFavorite(String name) throws Exception {
