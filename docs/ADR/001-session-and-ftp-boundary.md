@@ -141,6 +141,8 @@ sequenceDiagram
 
 ### Technical acceptance criteria
 
+The Windows probe records the [legacy transport qualification](../transport-qualification.md) as each scenario is verified.
+
 - **TAC-001-01** Verified connection inputs, results, and progress events reaching UI code contain only JFTP-owned types.
 - **TAC-001-02** A dated Windows compatibility matrix records each mode, the fixture and certificate setup, actual outcome and default-JDK failure reason where applicable.
 - **TAC-001-03** Successful binary upload and download match the fixture's SHA-256, and a successful directory refresh reflects the transferred items.
