@@ -19,6 +19,17 @@ The baseline pins Compiler 3.14.1, Surefire 3.5.4, JAR 2.4, Source 2.1.2, Assemb
 
 The assembly puts the application JAR beside a `lib/` folder with FTP API and JavaHelp. The application manifest names the desktop entry point and references the adjacent libraries. The five configured resource roots merge into the JAR with their classpath paths intact. Test tools are outside the runtime distribution. At the recovered baseline, the scripts looked for the application JAR under `lib/`, while the extracted ZIP contained it at the root. [Assembly descriptor](../src/main/assembly/binary.xml) · [Runtime resource inventory](jftp-runtime-resources.md)
 
-Build on Windows with `mvn clean package` and extract `target/jftp-5.0.2-SNAPSHOT-bin.zip`. Run `jftp.bat` in the extracted directory. The Windows launcher resolves the JAR relative to itself and selects Java from `JAVA_HOME` or `PATH`. [Windows launcher](../src/main/scripts/jftp.bat) · [Verification](testing.md#windows-launcher-recovery)
+Set `JAVA_HOME` to Oracle JDK 25.0.5.1 on Windows x64 and build with `.\mvnw.cmd clean verify`. Extract `target/jftp-5.0.2-SNAPSHOT-bin.zip` and run the extracted `jftp.bat`. The launcher resolves the JAR relative to itself and selects Java from `JAVA_HOME` or `PATH`. [Windows launcher](../src/main/scripts/jftp.bat) · [Verification](testing.md#windows-jdk-25-verification)
 
-For the JDK 25 upgrade, preserve the exact FTP API and JavaHelp artifacts initially. Their replacement requires real protocol and help-parity evidence. The build and test stack can move separately because it does not provide the product's runtime FTP or help implementation. The accepted [desktop ADR](ADR/000-main-architecture.md) records the toolchain and package gates. Use the [modernization plan](modernization-plan.md) to sequence the changes.
+## Pinned Windows toolchain
+
+The desktop compiler emits Java 25 class files and excludes `OSXAdapterOld.java`. Maven Wrapper 3.3.4 downloads Maven 3.10.1 and validates the ZIP with its pinned SHA-256. The Windows probe checked the Oracle JDK ZIP against Oracle's SHA-256 and the Maven distribution against Apache's SHA-512 before extraction. [Desktop ADR](ADR/000-main-architecture.md#3-system-architecture) · [Wrapper configuration](../.mvn/wrapper/maven-wrapper.properties)
+
+| Windows ZIP | SHA-256 |
+| --- | --- |
+| Oracle JDK 25.0.5.1 x64 | `163cf56d2920ac14fe1d1f503f14ea1b60a1866dd4113bb785d62a9a5585e733` |
+| Apache Maven 3.10.1 | `9c1ef9174ef250a5009ed0dec97cbe8699acf7479add4e62bf7b0ea791c0adb5` |
+| Packaged FTP API 3.0.0 JAR | `496782add046e211b5f7a686c483522cca8879048f12286249aa50c8f86b505c` |
+| Packaged JavaHelp 2.0.05 JAR | `fcf4922d38ff85184f1d2328317bb60826e14da948abd606ee3d5b8c6a70debd` |
+
+The build pins Clean 3.2.0, Resources 3.4.0, Compiler 3.14.1, Surefire 3.5.4, JAR 3.4.2, Source 3.3.1, Assembly 3.7.1, and Install 3.1.4. The FTP API and JavaHelp checksums match the recovered baseline. Use the [modernization plan](modernization-plan.md) to sequence any subsequent transport and JavaHelp work.

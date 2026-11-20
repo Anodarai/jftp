@@ -21,7 +21,7 @@ platforms such as Windows, Mac OS X, Linux, Solaris, HP-UX, OS/2, UNIX or any
 other platform with a compatible JVM (Java Virtual Machine). 
 
 See the [engineering documentation](docs/README.md) for the desktop architecture, development setup and modernization plan.
-Run the Windows baseline suite with `mvn test`. See [test coverage and verification](docs/testing.md) for setup and scope.
+On Windows x64, set `JAVA_HOME` to the qualified JDK 25 and run `mvnw.cmd clean verify`. See [test coverage and verification](docs/testing.md) for setup and scope.
 
 Features
 --------

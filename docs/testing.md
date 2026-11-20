@@ -52,3 +52,24 @@ On Windows 11 x64, rebuilding with Temurin 25.0.4.1 and Maven 3.9.16 passed all 
 The script extracts to a path with spaces and calls the launcher from a different working directory. It checks startup with `JAVA_HOME` and with only the JDK on `PATH`. An invalid `JAVA_HOME` and missing Java on `PATH` each produce an actionable diagnostic and exit code 1. It uses headless mode for these command-line checks.
 
 For native QA, the extracted `jftp.bat` ran from its parent directory with the Oracle JDK and an isolated English profile containing two synthetic local files. One disconnected tab opened, F1 displayed the bundled Contents topic, and Alt+F4 closed Help and then JFTP. Standard output was empty and standard error contained only the JVM's notice that it had picked up the synthetic-home option. [Disconnected tab](qa/screens/launcher-packaged-startup.jpg) · [JavaHelp Contents](qa/screens/launcher-packaged-help.jpg)
+
+## Windows JDK 25 verification
+
+On Windows 11 x64 with Oracle JDK 25.0.5.1 and Maven Wrapper 3.3.4 running Maven 3.10.1, `.\mvnw.cmd clean verify` passed all 10 baseline tests. The archive check rejected the Java 8 baseline with class version 52 and passed for the rebuilt ZIP with class version 69.
+
+```powershell
+.\src\test\scripts\Test-WindowsPackage.ps1 -Archive .\target\jftp-5.0.2-SNAPSHOT-bin.zip -ExpectedJavaRelease 25
+```
+
+The probed ZIP SHA-256 was `175702233650ba22dcb9e1c62b1784faf78299d6df2e5b323784f6b28825e8b0`. The manifest names `JFTPApplication` and the two baseline runtime JARs under `lib/`. The ZIP contained no test libraries. Comparison with the recovered baseline found 377 byte-identical resource entries and three fewer compiler-generated classes. The missing synthetic classes are the Java 8 access helpers for `MDialog`, `MInternalFrame`, and `OSXAdapter`. Compilation reported the legacy browser applet's JDK removal warning. Assembly reported the existing warning about attaching the loose directory. [Toolchain and runtime checksums](build-and-dependencies.md#pinned-windows-toolchain)
+
+Native QA used the extracted `jftp.bat` from another working directory with separate synthetic homes and update checks disabled.
+
+| Check | Result |
+| --- | --- |
+| Startup and Help | The English profile showed one disconnected tab and the synthetic local files. F1 opened Contents. [Startup](qa/screens/toolchain-startup.jpg) · [Help](qa/screens/toolchain-help.jpg) |
+| Localization | The German and Traditional Chinese profiles showed translated menus and session labels. An Italian profile used English UI text and Italian date formatting. [German](qa/screens/toolchain-german.jpg) · [Traditional Chinese](qa/screens/toolchain-traditional-chinese.jpg) · [English fallback](qa/screens/toolchain-english-fallback.jpg) |
+| Validation and cancellation | Connect rejected an empty host, returned focus to Host Name, and could be cancelled back to the disconnected tab. [Validation](qa/screens/toolchain-validation.jpg) |
+| Favorite and transfers | The saved site connected to Apache MINA FtpServer 1.2.1 on IPv4 loopback and listed `/incoming`. F9 uploaded `upload.bin` and F7 downloaded `download.bin`. The destination listings refreshed and source and destination SHA-256 matched for both files. F4 cleared the remote listing. [Favorite](qa/screens/toolchain-favorite.jpg) · [Transfers](qa/screens/toolchain-transfers.jpg) · [Disconnected](qa/screens/toolchain-disconnected.jpg) |
+
+Upload SHA-256 was `fc745af96e9674102571aeb7ddf3fd82c7ce457352569c801bf8e620fb2a797b`. Download SHA-256 was `bba3057854925e69b0be9275ce165edbab3fd09b62dc5a1fcc4b84e25f7f3e9d`. The server logged binary mode, successful `STOR` and `RETR` replies, and a normal disconnect. The four app launches produced no output beyond the JVM notices for the synthetic-home setting.

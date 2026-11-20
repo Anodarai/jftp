@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory)] [string] $Archive,
-    [string] $JdkHome = $env:JAVA_HOME
+    [string] $JdkHome = $env:JAVA_HOME,
+    [int] $ExpectedJavaRelease
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,6 +51,36 @@ try {
         throw "Expected one packaged Windows launcher, found $($launchers.Count)."
     }
     $launcher = $launchers[0]
+    if ($ExpectedJavaRelease) {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $jars = @(Get-ChildItem -LiteralPath $launcher.DirectoryName -File -Filter '*.jar')
+        if ($jars.Count -ne 1) {
+            throw "Expected one application JAR beside the Windows launcher, found $($jars.Count)."
+        }
+        $jar = [IO.Compression.ZipFile]::OpenRead($jars[0].FullName)
+        try {
+            $entry = $jar.GetEntry('com/myjavaworld/jftp/JFTPApplication.class')
+            if (-not $entry) {
+                throw 'The packaged JAR is missing its desktop entry point.'
+            }
+            $reader = [IO.BinaryReader]::new($entry.Open())
+            try {
+                $header = $reader.ReadBytes(8)
+                if ($header.Length -ne 8) {
+                    throw 'The desktop entry point has a truncated class header.'
+                }
+                $majorVersion = ([int]$header[6] -shl 8) + $header[7]
+                $expectedMajorVersion = $ExpectedJavaRelease + 44
+                if ($majorVersion -ne $expectedMajorVersion) {
+                    throw "Expected Java $ExpectedJavaRelease class version $expectedMajorVersion, found $majorVersion."
+                }
+            } finally {
+                $reader.Dispose()
+            }
+        } finally {
+            $jar.Dispose()
+        }
+    }
     if (-not $JdkHome) {
         $JdkHome = Split-Path -Parent (Split-Path -Parent (Get-Command java.exe -CommandType Application).Source)
     }
