@@ -44,7 +44,6 @@ import javax.swing.TransferHandler;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.gui.DateCellRenderer;
 import com.myjavaworld.gui.GUIUtil;
 import com.myjavaworld.gui.MButton;
@@ -104,9 +103,9 @@ public class RemotePane extends JPanel implements ActionListener,
 		updateTableHeader();
 	}
 
-	public void setData(RemoteFile dir, RemoteFile[] data) {
+	public void setData(RemoteEntry dir, RemoteEntry[] data) {
 		if (data == null) {
-			data = new RemoteFile[0];
+			data = new RemoteEntry[0];
 		}
 		Arrays.sort(data, comparator);
 		model.setData(data);
@@ -119,7 +118,7 @@ public class RemotePane extends JPanel implements ActionListener,
 		updateStatus();
 	}
 
-	public RemoteFile[] getData() {
+	public RemoteEntry[] getData() {
 		return model.getData();
 	}
 
@@ -127,7 +126,7 @@ public class RemotePane extends JPanel implements ActionListener,
 		return table.getSelectedRowCount();
 	}
 
-	public RemoteFile getSelectedFile() {
+	public RemoteEntry getSelectedFile() {
 		int row = table.getSelectedRow();
 		if (row < 0) {
 			return null;
@@ -135,12 +134,12 @@ public class RemotePane extends JPanel implements ActionListener,
 		return model.getFileAt(row);
 	}
 
-	public RemoteFile[] getSelectedFiles() {
+	public RemoteEntry[] getSelectedFiles() {
 		int[] selectedRows = table.getSelectedRows();
 		if (selectedRows == null) {
-			return new RemoteFile[0];
+			return new RemoteEntry[0];
 		}
-		RemoteFile[] selectedFiles = new RemoteFile[selectedRows.length];
+		RemoteEntry[] selectedFiles = new RemoteEntry[selectedRows.length];
 		for (int i = 0; i < selectedRows.length; i++) {
 			selectedFiles[i] = model.getFileAt(selectedRows[i]);
 		}
@@ -153,7 +152,7 @@ public class RemotePane extends JPanel implements ActionListener,
 
 	public void clearAll() {
 		comboWorkingDirectory.setModel(new DefaultComboBoxModel());
-		model.setData(new RemoteFile[0]);
+		model.setData(new RemoteEntry[0]);
 	}
 
 	public void valueChanged(ListSelectionEvent evt) {
@@ -165,7 +164,7 @@ public class RemotePane extends JPanel implements ActionListener,
 		if (evt.getSource() == butUp) {
 			session.upRemoteWorkingDirectory();
 		} else if (evt.getSource() == comboWorkingDirectory) {
-			RemoteFile selectedFile = (RemoteFile) comboWorkingDirectory
+			RemoteEntry selectedFile = (RemoteEntry) comboWorkingDirectory
 					.getSelectedItem();
 			updateComboWorkingDirectory = false;
 			session.setRemoteWorkingDirectory(selectedFile);
@@ -235,7 +234,7 @@ public class RemotePane extends JPanel implements ActionListener,
 		if (row < 0) {
 			return;
 		}
-		RemoteFile file = model.getFileAt(row);
+		RemoteEntry file = model.getFileAt(row);
 		if (file.isDirectory() || file.isLink()) {
 			session.setRemoteWorkingDirectory(file);
 		} else {
@@ -244,7 +243,7 @@ public class RemotePane extends JPanel implements ActionListener,
 		}
 	}
 
-	private void updateComboWorkingDirectory(RemoteFile dir) {
+	private void updateComboWorkingDirectory(RemoteEntry dir) {
 		comboWorkingDirectory.removeActionListener(this);
 		int count = comboWorkingDirectory.getItemCount();
 		for (int i = 0; i < count; i++) {
@@ -293,7 +292,7 @@ public class RemotePane extends JPanel implements ActionListener,
 		}
 		comparator.setCompareBy(compareBy);
 		comparator.setOrder(order);
-		RemoteFile[] data = model.getData();
+		RemoteEntry[] data = model.getData();
 		Arrays.sort(model.getData(), comparator);
 		model.setData(data);
 		updateTableHeader();
@@ -393,7 +392,7 @@ public class RemotePane extends JPanel implements ActionListener,
 
 		int dateFormat = JFTP.prefs.getDateFormat();
 		int timeFormat = JFTP.prefs.getTimeFormat();
-		table.setDefaultRenderer(RemoteFile.class, new RemoteFileCellRenderer());
+		table.setDefaultRenderer(RemoteEntry.class, new RemoteFileCellRenderer());
 		table.setDefaultRenderer(Long.class, new NumericCellRenderer());
 		table.setDefaultRenderer(Date.class, new DateCellRenderer(dateFormat,
 				timeFormat));

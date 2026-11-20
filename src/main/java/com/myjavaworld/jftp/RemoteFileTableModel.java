@@ -20,7 +20,6 @@ import java.util.ResourceBundle;
 
 import javax.swing.table.AbstractTableModel;
 
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.util.ResourceLoader;
 
 /**
@@ -39,29 +38,29 @@ public class RemoteFileTableModel extends AbstractTableModel {
 			resources.getString("text.size"),
 			resources.getString("text.lastModified"),
 			resources.getString("text.attributes") };
-	private RemoteFile[] data = null;
+	private RemoteEntry[] data = null;
 
 	public RemoteFileTableModel() {
-		this(new RemoteFile[0]);
+		this(new RemoteEntry[0]);
 	}
 
-	public RemoteFileTableModel(RemoteFile[] data) {
+	public RemoteFileTableModel(RemoteEntry[] data) {
 		setData(data);
 	}
 
-	public void setData(RemoteFile[] data) {
+	public void setData(RemoteEntry[] data) {
 		if (data == null) {
-			data = new RemoteFile[0];
+			data = new RemoteEntry[0];
 		}
 		this.data = data;
 		fireTableDataChanged();
 	}
 
-	public RemoteFile[] getData() {
+	public RemoteEntry[] getData() {
 		return data;
 	}
 
-	public RemoteFile getFileAt(int row) {
+	public RemoteEntry getFileAt(int row) {
 		return data[row];
 	}
 
@@ -97,7 +96,7 @@ public class RemoteFileTableModel extends AbstractTableModel {
 	@Override
 	public Class getColumnClass(int col) {
 		if (col == 0) {
-			return RemoteFile.class;
+			return RemoteEntry.class;
 		}
 		if (col == 2) {
 			return Long.class;

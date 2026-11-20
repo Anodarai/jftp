@@ -15,7 +15,6 @@
  */
 package com.myjavaworld.jftp;
 
-import com.myjavaworld.ftp.RemoteFile;
 
 /**
  * @author Sai Pullabhotla
@@ -26,10 +25,10 @@ public class TransferObject {
 	public static int UPLOAD = 2;
 	private int direction = 0;
 	private LocalFile localFile = null;
-	private RemoteFile remoteFile = null;
+	private RemoteEntry remoteFile = null;
 
 	public TransferObject(int direction, LocalFile localFile,
-			RemoteFile remoteFile) {
+			RemoteEntry remoteFile) {
 		this.direction = direction;
 		this.localFile = localFile;
 		this.remoteFile = remoteFile;
@@ -43,7 +42,7 @@ public class TransferObject {
 		return localFile;
 	}
 
-	public RemoteFile getRemoteFile() {
+	public RemoteEntry getRemoteFile() {
 		return remoteFile;
 	}
 

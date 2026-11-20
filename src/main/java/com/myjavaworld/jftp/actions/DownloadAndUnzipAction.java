@@ -19,9 +19,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 
-import com.myjavaworld.ftp.RemoteFile;
+import com.myjavaworld.jftp.RemoteEntry;
 import com.myjavaworld.gui.GUIUtil;
-import com.myjavaworld.gui.SwingWorker;
 import com.myjavaworld.jftp.DownloadAndUnzipDlg;
 import com.myjavaworld.jftp.FTPSession;
 import com.myjavaworld.jftp.JFTP;
@@ -60,7 +59,7 @@ public class DownloadAndUnzipAction implements ActionListener {
 		if (session == null || !session.isConnected()) {
 			return;
 		}
-		final RemoteFile selectedFile = session.getSelectedRemoteFile();
+		final RemoteEntry selectedFile = session.getSelectedRemoteFile();
 		if (selectedFile == null) {
 			return;
 		}
@@ -80,7 +79,7 @@ public class DownloadAndUnzipAction implements ActionListener {
 		System.gc();
 		session.clearAbortFlag();
 		session.setBusy(true);
-		new SwingWorker() {
+		session.new Worker() {
 
 			private Throwable error = null;
 

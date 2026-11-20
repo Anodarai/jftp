@@ -35,7 +35,6 @@ import javax.swing.ButtonGroup;
 import javax.swing.JFileChooser;
 import javax.swing.JPanel;
 
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.gui.GUIUtil;
 import com.myjavaworld.gui.MButton;
 import com.myjavaworld.gui.MDialog;
@@ -68,10 +67,10 @@ public class DownloadAndUnzipDlg extends MDialog implements ActionListener,
 	private MButton butDownload = null;
 	private MButton butCancel = null;
 	private MButton butHelp = null;
-	private RemoteFile remoteFile = null;
+	private RemoteEntry remoteFile = null;
 	private boolean approved = false;
 
-	public DownloadAndUnzipDlg(JFTP jftp, RemoteFile remoteFile) {
+	public DownloadAndUnzipDlg(JFTP jftp, RemoteEntry remoteFile) {
 		super(jftp);
 		this.jftp = jftp;
 		this.remoteFile = remoteFile;

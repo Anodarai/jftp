@@ -33,22 +33,14 @@ import javax.swing.JSplitPane;
 import javax.swing.Timer;
 import javax.swing.filechooser.FileSystemView;
 
-import com.myjavaworld.ftp.ConnectionException;
-import com.myjavaworld.ftp.ControlConnectionEvent;
-import com.myjavaworld.ftp.ControlConnectionListener;
-import com.myjavaworld.ftp.DataConnectionEvent;
-import com.myjavaworld.ftp.DataConnectionListener;
-import com.myjavaworld.ftp.FTPClient;
-import com.myjavaworld.ftp.FTPConnectionEvent;
-import com.myjavaworld.ftp.FTPConnectionListener;
 import com.myjavaworld.ftp.FTPConstants;
-import com.myjavaworld.ftp.FTPException;
-import com.myjavaworld.ftp.FTPUtil;
-import com.myjavaworld.ftp.ListParser;
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.gui.GUIUtil;
 import com.myjavaworld.gui.MScrollPane;
-import com.myjavaworld.gui.SwingWorker;
+import com.myjavaworld.jftp.LegacyFtpAdapter.Endpoint;
+import com.myjavaworld.jftp.LegacyFtpAdapter.Event;
+import com.myjavaworld.jftp.LegacyFtpAdapter.LinkFailure;
+import com.myjavaworld.jftp.LegacyFtpAdapter.ListingFilter;
+import com.myjavaworld.jftp.LegacyFtpAdapter.ReplyFailure;
 import com.myjavaworld.jftp.ssl.JFTPSSLContext;
 import com.myjavaworld.util.FileChangeEvent;
 import com.myjavaworld.util.FileChangeListener;
@@ -67,8 +59,7 @@ import com.myjavaworld.zip.ZipListener;
  * @author Sai Pullabhotla, psai [at] jMethods [dot] com
  * @version 2.0
  */
-public class FTPSession extends SessionPanel implements FTPConnectionListener,
-		ControlConnectionListener, DataConnectionListener, ActionListener,
+public class FTPSession extends SessionPanel implements ActionListener,
 		FileChangeListener, ProgressListener, ZipListener {
 
 	private static final ResourceBundle resources = ResourceLoader
@@ -76,10 +67,11 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	private LocalPane localPane = null;
 	private JFTP jftp = null;
 	private RemotePane remotePane = null;
-	private FTPClient client = null;
-	private ListParser listParser = null;
+	private final SessionCoordinator operations = new SessionCoordinator();
+	private volatile LegacyFtpAdapter client = null;
+	private volatile Object transportOrigin;
 	private LocalFile lwd = null;
-	private RemoteFile rwd = null;
+	private RemoteEntry rwd = null;
 	private StatusWindow statusWindow = null;
 	private StatusBar statusBar = null;
 	private Timer timer = null;
@@ -97,9 +89,9 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	private RemoteHost remoteHost = null;
 	private int transferType = FTPConstants.TYPE_BINARY;
 	private boolean autoDetect = true;
-	private boolean abort = false;
+	private volatile boolean abort = false;
 	private Filter localFileFilter = null;
-	private Filter remoteFileFilter = null;
+	private ListingFilter remoteFileFilter = null;
 	private FileChangeMonitor fileChangeMonitor = null;
 	private Hashtable monitoredTransfers = null;
 	private MessageFormat zipStatusFormat = null;
@@ -151,6 +143,10 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	}
 
 	public void fileChanged(FileChangeEvent evt) {
+		operations.publish(() -> handleFileChange(evt));
+	}
+
+	private void handleFileChange(FileChangeEvent evt) {
 		File file = evt.getFile();
 		TransferObject transferObject = (TransferObject) monitoredTransfers
 				.get(file);
@@ -158,7 +154,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			return;
 		}
 		final LocalFile localFile = transferObject.getLocalFile();
-		final RemoteFile remoteFile = transferObject.getRemoteFile();
+		final RemoteEntry remoteFile = transferObject.getRemoteFile();
 		MessageFormat formatter = new MessageFormat(
 				resources.getString("confirm.uploadChangedFile"));
 		String message = formatter.format(new Object[] { remoteFile,
@@ -168,21 +164,21 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			return;
 		}
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			private RemoteFile[] children = null;
+			private RemoteEntry[] children = null;
 
 			@Override
 			public Object construct() {
 				upload(localFile, remoteFile);
 				try {
 					children = client.list(remoteFileFilter);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError("<ERROR> " + exp);
+					operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 					exp.printStackTrace();
 				}
 				return null;
@@ -196,13 +192,21 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		}.start();
 	}
 
+	private void updateOwnToolbar() {
+		operations.publish(() -> {
+			if (jftp.getCurrentSession() == this) {
+				jftp.updateToolBar();
+			}
+		});
+	}
+
 	public int getId() {
 		return id;
 	}
 
 	@Override
 	public void setBusy(boolean busy) {
-		super.setBusy(busy);
+		operations.publish(() -> super.setBusy(busy));
 	}
 
 	public void setTransferType(int transferType) {
@@ -237,13 +241,13 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		Object source = evt.getSource();
 		if (source == timer) {
 			timeElapsed++;
-			statusBar.setProgress((int) bytesTransferred);
-			statusBar.setSpeed(bytesTransferred / timeElapsed);
-			statusBar.setTimeElapsed(JFTPUtil.getTimeString(timeElapsed));
+			operations.publish(() -> statusBar.setProgress((int) bytesTransferred));
+			operations.publish(() -> statusBar.setSpeed(bytesTransferred / timeElapsed));
+			operations.publish(() -> statusBar.setTimeElapsed(JFTPUtil.getTimeString(timeElapsed)));
 		} else if (source == progressTimer) {
 			timeElapsed++;
-			statusBar.setProgress(progress);
-			statusBar.setTimeElapsed(JFTPUtil.getTimeString(timeElapsed));
+			operations.publish(() -> statusBar.setProgress(progress));
+			operations.publish(() -> statusBar.setTimeElapsed(JFTPUtil.getTimeString(timeElapsed)));
 		}
 	}
 
@@ -270,7 +274,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	/**
 	 * @param filter
 	 */
-	public void setRemoteFileFilter(Filter filter) {
+	public void setRemoteFileFilter(ListingFilter filter) {
 		this.remoteFileFilter = filter;
 		remotePane.refresh();
 	}
@@ -278,7 +282,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	/**
 	 * @return current filter set on local files.
 	 */
-	public Filter getRemoteFileFilter() {
+	public ListingFilter getRemoteFileFilter() {
 		return remoteFileFilter;
 	}
 
@@ -313,25 +317,66 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	}
 
 	public void closeSession() {
-		if (client != null && client.isConnected()) {
-			try {
-				client.disconnect();
-			} catch (FTPException exp) {
-				ftpException(exp);
-			} catch (Exception exp) {
-				exp.printStackTrace();
+		abort = true;
+		timer.stop();
+		progressTimer.stop();
+		operations.close(() -> {
+			LegacyFtpAdapter retired = client;
+			if (retired != null) {
+				retired.close();
 			}
+			fileChangeMonitor.stopMonitor();
+		});
+	}
+
+	public void abortTransfer() {
+		LegacyFtpAdapter target = client;
+		if (target == null || !target.isConnected()) {
+			return;
 		}
-		fileChangeMonitor.stopMonitor();
-		cleanup();
-		System.gc();
+		abort = true;
+		operations.signal(() -> {
+			try {
+				target.abort();
+			} catch (ReplyFailure failure) {
+				ftpException(failure);
+			} catch (LinkFailure failure) {
+				connectionException(failure);
+			}
+		});
+	}
+
+	public abstract class Worker {
+		public abstract Object construct();
+
+		public void finished() {
+		}
+
+		public final void start() {
+			operations.submit(() -> setBusy(true), this::construct, failure -> {
+				try {
+					if (failure == null) {
+						finished();
+					} else {
+						exception(failure);
+						operations.publish(() -> statusBar.reset());
+					}
+				} finally {
+					setBusy(false);
+				}
+			});
+		}
+	}
+
+	void publishUi(Runnable result) {
+		operations.publish(result);
 	}
 
 	public RemoteHost getRemoteHost() {
 		return remoteHost;
 	}
 
-	public FTPClient getFTPClient() {
+	LegacyFtpAdapter getTransport() {
 		return client;
 	}
 
@@ -350,7 +395,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			return;
 		}
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
 			LocalFile[] data = null;
 
@@ -389,45 +434,45 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	}
 
 	public void setRemoteWorkingDirectory(String name) {
-		RemoteFile dir = listParser.createRemoteFile(name, true);
+		RemoteEntry dir = client.createRemoteFile(name, true);
 		setRemoteWorkingDirectory(dir);
 	}
 
-	public RemoteFile getRemoteWorkingDirectory() {
+	public RemoteEntry getRemoteWorkingDirectory() {
 		return rwd;
 	}
 
-	public void setRemoteWorkingDirectory(final RemoteFile dir) {
+	public void setRemoteWorkingDirectory(final RemoteEntry dir) {
 		if (dir == null || !(dir.isDirectory() || dir.isLink())) {
 			return;
 		}
 		Object args = new Object[] { dir.getName() };
 		String status = listStatusFormat.format(args);
-		statusBar.setStatus(status);
-		statusBar.setIndeterminate(true);
+		operations.publish(() -> statusBar.setStatus(status));
+		operations.publish(() -> statusBar.setIndeterminate(true));
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] data = null;
+			RemoteEntry[] data = null;
 
 			@Override
 			public Object construct() {
 				try {
 					client.setWorkingDirectory(dir);
-					RemoteFile wd = client.getWorkingDirectory();
+					RemoteEntry wd = client.getWorkingDirectory();
 					rwd = wd;
 					data = client.list(remoteFileFilter);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
 				} catch (ParseException exp) {
 					statusWindow
 							.addError("<ERROR> Could not parse the LIST command output. "
 									+ "The original data returned by the server is: \n"
 									+ exp.getMessage());
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError("<ERROR> " + exp);
+					operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -437,7 +482,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			@Override
 			public void finished() {
 				remotePane.setData(rwd, data);
-				statusBar.reset();
+				operations.publish(() -> statusBar.reset());
 				setBusy(false);
 			}
 		}.start();
@@ -447,31 +492,31 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		if (!isConnected()) {
 			return;
 		}
-		statusBar.setStatus(listParentStatus);
-		statusBar.setIndeterminate(true);
+		operations.publish(() -> statusBar.setStatus(listParentStatus));
+		operations.publish(() -> statusBar.setIndeterminate(true));
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] data = null;
+			RemoteEntry[] data = null;
 
 			@Override
 			public Object construct() {
 				try {
 					client.setToParentDirectory();
-					RemoteFile wd = client.getWorkingDirectory();
+					RemoteEntry wd = client.getWorkingDirectory();
 					rwd = wd;
 					data = client.list(remoteFileFilter);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
 				} catch (ParseException exp) {
 					statusWindow
 							.addError("<ERROR> Could not parse the LIST command output. "
 									+ "The original data returned by the server is: \n"
 									+ exp.getMessage());
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError("<ERROR> " + exp);
+					operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -481,7 +526,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			@Override
 			public void finished() {
 				remotePane.setData(rwd, data);
-				statusBar.reset();
+				operations.publish(() -> statusBar.reset());
 				setBusy(false);
 			}
 		}.start();
@@ -507,80 +552,72 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		return remotePane.getSelectionCount();
 	}
 
-	public RemoteFile getSelectedRemoteFile() {
+	public RemoteEntry getSelectedRemoteFile() {
 		return remotePane.getSelectedFile();
 	}
 
-	public RemoteFile[] getSelectedRemoteFiles() {
+	public RemoteEntry[] getSelectedRemoteFiles() {
 		return remotePane.getSelectedFiles();
 	}
 
-	public void connectionOpened(FTPConnectionEvent evt) {
-		statusWindow.addStatus("<STATUS> " + evt.getMessage());
-		statusBar.setSecured(client.isSecured());
-		jftp.updateToolBar();
+	private void onTransportEvent(Object connection, Event event) {
+		operations.publish(() -> {
+			if (transportOrigin == connection) {
+				applyTransportEvent(event);
+			}
+		});
 	}
 
-	public void connectionClosed(FTPConnectionEvent evt) {
-		setBusy(false);
-		statusWindow.addStatus("<STATUS> " + evt.getMessage());
-		jftp.updateToolBar();
-		timer.stop();
-		this.timeElapsed = 0;
-		this.bytesTransferred = 0L;
-		statusBar.reset();
-		statusBar.setSecured(false);
-		remotePane.clearAll();
-		updateTitle();
-	}
-
-	public void commandSent(ControlConnectionEvent evt) {
-		statusWindow.addCommand("<COMMAND> " + evt.getMessage());
-	}
-
-	public void replyReceived(ControlConnectionEvent evt) {
-		statusWindow.addReply("<REPLY> " + evt.getMessage());
-	}
-
-	public void connectionDropped(ControlConnectionEvent evt) {
-		statusWindow.addStatus("<STATUS>" + evt.getMessage());
-	}
-
-	public void dataTransferStarted(DataConnectionEvent evt) {
-	}
-
-	public void dataTransferFinished(DataConnectionEvent evt) {
-		statusBar.setProgress(0);
-	}
-
-	public void dataTransferProgress(DataConnectionEvent evt) {
-		bytesTransferred = evt.getBytesTransferred();
-	}
-
-	public void dataTransferAborted(DataConnectionEvent evt) {
-		statusWindow.addStatus("<STATUS> Data transfer aborted by the user. ");
-		timer.stop();
-		this.timeElapsed = 0;
-		this.bytesTransferred = 0L;
-		statusBar.reset();
-	}
-
-	public void dataTransferError(DataConnectionEvent evt) {
+	private void applyTransportEvent(Event event) {
+		switch (event.kind()) {
+		case CONNECTED -> {
+			statusWindow.addStatus("<STATUS> " + event.message());
+			statusBar.setSecured(client != null && client.isSecured());
+			updateOwnToolbar();
+		}
+		case DISCONNECTED -> {
+			setBusy(false);
+			statusWindow.addStatus("<STATUS> " + event.message());
+			updateOwnToolbar();
+			timer.stop();
+			timeElapsed = 0;
+			bytesTransferred = 0L;
+			statusBar.reset();
+			statusBar.setSecured(false);
+			remotePane.clearAll();
+			updateTitle();
+		}
+		case COMMAND -> statusWindow.addCommand("<COMMAND> " + event.message());
+		case REPLY -> statusWindow.addReply("<REPLY> " + event.message());
+		case TRANSFER_FINISHED -> statusBar.setProgress(0);
+		case TRANSFER_PROGRESS -> bytesTransferred = event.bytes();
+		case TRANSFER_ABORTED -> {
+			statusWindow.addStatus("<STATUS> Data transfer aborted by the user. ");
+			timer.stop();
+			timeElapsed = 0;
+			bytesTransferred = 0L;
+			statusBar.reset();
+		}
+		}
 	}
 
 	public void ftpException(Exception exp) {
-		statusWindow.addError(exp.getMessage());
+		operations.publish(() -> statusWindow.addError(exp.getMessage()));
 	}
 
 	public void exception(Throwable t) {
-		statusWindow.addError(t.toString());
+		operations.publish(() -> statusWindow.addError(t.toString()));
 		t.printStackTrace();
 	}
 
 	public void connectionException(Exception exp) {
+		operations.publish(() -> applyConnectionFailure(exp));
+	}
+
+	private void applyConnectionFailure(Exception exp) {
 		setBusy(false);
 		statusWindow.addError(exp.getMessage());
-		jftp.updateToolBar();
+		updateOwnToolbar();
 		timer.stop();
 		this.timeElapsed = 0;
 		this.bytesTransferred = 0L;
@@ -605,78 +642,63 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			disconnect();
 		}
 		this.remoteHost = remoteHost;
-		Object args = new Object[] {
-				remoteHost.getHostName(),
-				(remoteHost.getSSLUsage() == FTPConstants.USE_IMPLICIT_SSL ? new Integer(
-						remoteHost.getImplicitSSLPort()) : new Integer(
-						remoteHost.getPort())) };
+		Endpoint endpoint = Endpoint.capture(remoteHost);
+		String[] startupCommands = remoteHost.getCommands();
+		String[] commands = startupCommands == null ? new String[0] : startupCommands.clone();
+		String initialRemoteDirectory = remoteHost.getInitialRemoteDirectory();
+		String initialLocalDirectory = remoteHost.getInitialLocalDirectory();
+		int timeout = JFTP.prefs.getTimeout();
+		int bufferSize = JFTP.prefs.getBufferSize();
+		Object args = new Object[] { endpoint.host(), endpoint.port() };
 		String status = connectStatusFormat.format(args);
-		statusBar.setStatus(status);
-		statusBar.setIndeterminate(true);
+		operations.publish(() -> statusBar.setStatus(status));
+		operations.publish(() -> statusBar.setIndeterminate(true));
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] data = null;
+			RemoteEntry[] data = null;
 
 			@Override
 			public Object construct() {
 				try {
-					client = (FTPClient) Class.forName(
-							remoteHost.getFTPClientClassName()).newInstance();
-					listParser = (ListParser) Class.forName(
-							remoteHost.getListParserClassName()).newInstance();
-					client.setListParser(listParser);
-					client.setPassive(remoteHost.isPassive());
-					client.setTimeout(JFTP.prefs.getTimeout());
-					client.setBufferSize(JFTP.prefs.getBufferSize());
-					client.setSSLUsage(remoteHost.getSSLUsage());
-					client.setDataChannelUnencrypted(remoteHost
-							.isDataChannelUnencrypted());
-					if (remoteHost.getSSLUsage() != FTPConstants.USE_NO_SSL) {
-						client.setSSLContext(JFTPSSLContext.getSSLContext(jftp,
-								remoteHost.getHostName()));
+					var ssl = endpoint.requiresSecurity()
+							? JFTPSSLContext.getSSLContext(jftp, endpoint.host(), () -> !operations.isClosed())
+							: null;
+					Object connection = new Object();
+					LegacyFtpAdapter transport = LegacyFtpAdapter.create(endpoint, timeout, bufferSize, ssl,
+							event -> onTransportEvent(connection, event));
+					transportOrigin = connection;
+					client = transport;
+					if (operations.isClosed()) {
+						transport.close();
+						return null;
 					}
-					client.addControlConnectionListener(FTPSession.this);
-					client.addDataConnectionListener(FTPSession.this);
-					client.addFTPConnectionListener(FTPSession.this);
 					try {
-						int port = 0;
-						if (remoteHost.getSSLUsage() == FTPConstants.USE_IMPLICIT_SSL) {
-							port = remoteHost.getImplicitSSLPort();
-						} else {
-							port = remoteHost.getPort();
-						}
-						client.connect(remoteHost.getHostName(), port);
-						client.login(remoteHost.getUser(),
-								remoteHost.getPassword(),
-								remoteHost.getAccount());
-					} catch (FTPException exp) {
+						client.connect();
+					} catch (ReplyFailure exp) {
 						ftpException(exp);
 						client.disconnect();
 						client = null;
 						return null;
 					}
-					String[] commands = remoteHost.getCommands();
 					for (int i = 0; i < commands.length; i++) {
 						client.executeCommand(commands[i]);
 					}
-					String initialRemoteDirectory = remoteHost
-							.getInitialRemoteDirectory();
 					if (initialRemoteDirectory != null
 							&& initialRemoteDirectory.trim().length() > 0) {
-						RemoteFile remoteDir = listParser
+						RemoteEntry remoteDir = client
 								.createRemoteFile(initialRemoteDirectory);
 						client.setWorkingDirectory(remoteDir);
 					}
-					RemoteFile dir = client.getWorkingDirectory();
+					RemoteEntry dir = client.getWorkingDirectory();
 					data = client.list(remoteFileFilter);
 					rwd = dir;
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError("<ERROR> " + exp.getMessage());
+					operations.publish(() -> statusWindow.addError("<ERROR> " + exp.getMessage()));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -689,10 +711,8 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 					remotePane.setData(rwd, data);
 					updateTitle();
 				}
-				statusBar.reset();
+				operations.publish(() -> statusBar.reset());
 				setBusy(false);
-				String initialLocalDirectory = remoteHost
-						.getInitialLocalDirectory();
 				setLocalWorkingDirectory(initialLocalDirectory);
 			}
 		}.start();
@@ -708,13 +728,13 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		if (!isConnected()) {
 			return;
 		}
-		final RemoteFile[] selectedFiles = remotePane.getSelectedFiles();
+		final RemoteEntry[] selectedFiles = remotePane.getSelectedFiles();
 		if (selectedFiles == null || selectedFiles.length == 0) {
 			return;
 		}
 		abort = false;
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
 			LocalFile[] children = null;
 
@@ -738,12 +758,12 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		}.start();
 	}
 
-	public void download(RemoteFile sourceDir, File targetDir, RemoteFile source) {
+	public void download(RemoteEntry sourceDir, File targetDir, RemoteEntry source) {
 		download(sourceDir, targetDir, source, null);
 	}
 
-	public void download(RemoteFile sourceDir, File targetDir,
-			RemoteFile source, String targetName) {
+	public void download(RemoteEntry sourceDir, File targetDir,
+			RemoteEntry source, String targetName) {
 
 		if (client == null || !client.isConnected() || abort) {
 			return;
@@ -765,12 +785,12 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			// timeElapsed = 0;
 			// timer.start();
 			// try {
-			// client.download(source, destination, type, false);
+			// client.download(source, destination, type);
 			// }
-			// catch(FTPException exp) {
+			// catch(ReplyFailure exp) {
 			// ftpException(exp);
 			// }
-			// catch(ConnectionException exp) {
+			// catch(LinkFailure exp) {
 			// connectionException(exp);
 			// }
 			// catch(Exception exp) {
@@ -789,16 +809,16 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			if (!target.exists()) {
 				target.mkdirs();
 			}
-			RemoteFile[] children = null;
+			RemoteEntry[] children = null;
 			try {
 				client.setWorkingDirectory(source);
 				children = client.list(remoteFileFilter);
-			} catch (FTPException exp) {
+			} catch (ReplyFailure exp) {
 				ftpException(exp);
-			} catch (ConnectionException exp) {
+			} catch (LinkFailure exp) {
 				connectionException(exp);
 			} catch (Exception exp) {
-				statusWindow.addError("<ERROR> " + exp);
+				operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 				exp.printStackTrace();
 			}
 			if (children != null) {
@@ -809,26 +829,26 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		}
 	}
 
-	public void downloadDataFile(RemoteFile source, File target) {
+	public void downloadDataFile(RemoteEntry source, File target) {
 		int type = getTransferType(source.getExtension());
 		Object[] args = { source.getName() };
-		statusBar.setStatus(downloadStatusFormat.format(args));
-		statusBar.setMaximum((int) source.getSize());
+		operations.publish(() -> statusBar.setStatus(downloadStatusFormat.format(args)));
+		operations.publish(() -> statusBar.setMaximum((int) source.getSize()));
 		timeElapsed = 0;
-		timer.start();
+		operations.publish(() -> timer.start());
 		try {
-			client.download(source, target, type, false);
-		} catch (FTPException exp) {
+			client.download(source, target, type);
+		} catch (ReplyFailure exp) {
 			ftpException(exp);
-		} catch (ConnectionException exp) {
+		} catch (LinkFailure exp) {
 			connectionException(exp);
 		} catch (Exception exp) {
-			statusWindow.addError("<ERROR> " + exp);
+			operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 			exp.printStackTrace();
 		} finally {
-			timer.stop();
+			operations.publish(() -> timer.stop());
 			timeElapsed = 0;
-			statusBar.reset();
+			operations.publish(() -> statusBar.reset());
 		}
 	}
 
@@ -842,9 +862,9 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		}
 		abort = false;
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] children = null;
+			RemoteEntry[] children = null;
 
 			@Override
 			public Object construct() {
@@ -856,12 +876,12 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 				}
 				try {
 					children = client.list(remoteFileFilter);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError("<ERROR> " + exp);
+					operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -876,12 +896,12 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		}.start();
 	}
 
-	public void upload(LocalFile sourceDir, RemoteFile targetDir,
+	public void upload(LocalFile sourceDir, RemoteEntry targetDir,
 			LocalFile source) {
 		upload(sourceDir, targetDir, source, null);
 	}
 
-	public void upload(LocalFile sourceDir, RemoteFile targetDir,
+	public void upload(LocalFile sourceDir, RemoteEntry targetDir,
 			LocalFile source, String targetName) {
 		if (client == null || !client.isConnected() || abort) {
 			return;
@@ -895,43 +915,43 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			targetName = source.getName();
 		}
 		if (source.isFile()) {
-			// RemoteFile destination = listParser.createRemoteFile(targetDir,
+			// RemoteEntry destination = client.createRemoteFile(targetDir,
 			// source.getName(), false);
-			RemoteFile destination = listParser.createRemoteFile(targetDir,
+			RemoteEntry destination = client.createRemoteFile(targetDir,
 					targetName, false);
 			int type = getTransferType(source.getExtension());
 			Object[] args = { destination.getName() };
-			statusBar.setStatus(uploadStatusFormat.format(args));
-			statusBar.setMaximum((int) source.getSize());
+			operations.publish(() -> statusBar.setStatus(uploadStatusFormat.format(args)));
+			operations.publish(() -> statusBar.setMaximum((int) source.getSize()));
 			timeElapsed = 0;
-			timer.start();
+			operations.publish(() -> timer.start());
 			try {
-				client.upload(source.getFile(), destination, type, false, 0L);
-			} catch (FTPException exp) {
+				client.upload(source.getFile(), destination, type);
+			} catch (ReplyFailure exp) {
 				ftpException(exp);
-			} catch (ConnectionException exp) {
+			} catch (LinkFailure exp) {
 				connectionException(exp);
 			} catch (Exception exp) {
-				statusWindow.addError("<ERROR> " + exp);
+				operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 				exp.printStackTrace();
 			} finally {
-				timer.stop();
+				operations.publish(() -> timer.stop());
 				timeElapsed = 0;
-				statusBar.reset();
+				operations.publish(() -> statusBar.reset());
 			}
 		} else if (source.isDirectory()) {
-			// RemoteFile destination = listParser.createRemoteFile(targetDir,
+			// RemoteEntry destination = client.createRemoteFile(targetDir,
 			// source.getName(), true);
-			RemoteFile destination = listParser.createRemoteFile(targetDir,
+			RemoteEntry destination = client.createRemoteFile(targetDir,
 					targetName, true);
 			try {
 				client.createDirectory(destination);
-			} catch (FTPException exp) {
+			} catch (ReplyFailure exp) {
 				ftpException(exp);
-			} catch (ConnectionException exp) {
+			} catch (LinkFailure exp) {
 				connectionException(exp);
 			} catch (Exception exp) {
-				statusWindow.addError("<ERROR> " + exp);
+				operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 				exp.printStackTrace();
 			}
 			LocalFile[] children = source.list(localFileFilter);
@@ -942,52 +962,52 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	}
 
 	public void upload(LocalFile localFile, String remoteFileName) {
-		RemoteFile remoteFile = listParser
+		RemoteEntry remoteFile = client
 				.createRemoteFile(rwd, remoteFileName);
 		upload(localFile, remoteFile);
 	}
 
-	public void upload(LocalFile localFile, RemoteFile destination) {
+	public void upload(LocalFile localFile, RemoteEntry destination) {
 		int type = getTransferType(localFile.getExtension());
 		Object[] args = { destination.getName() };
-		statusBar.setStatus(uploadStatusFormat.format(args));
-		statusBar.setMaximum((int) localFile.getSize());
+		operations.publish(() -> statusBar.setStatus(uploadStatusFormat.format(args)));
+		operations.publish(() -> statusBar.setMaximum((int) localFile.getSize()));
 		timeElapsed = 0;
-		timer.start();
+		operations.publish(() -> timer.start());
 		try {
-			client.upload(localFile.getFile(), destination, type, false, 0L);
-		} catch (FTPException exp) {
+			client.upload(localFile.getFile(), destination, type);
+		} catch (ReplyFailure exp) {
 			ftpException(exp);
-		} catch (ConnectionException exp) {
+		} catch (LinkFailure exp) {
 			connectionException(exp);
 		} catch (Exception exp) {
-			statusWindow.addError("<ERROR> " + exp);
+			operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 			exp.printStackTrace();
 		} finally {
-			timer.stop();
+			operations.publish(() -> timer.stop());
 			timeElapsed = 0;
-			statusBar.reset();
+			operations.publish(() -> statusBar.reset());
 		}
 	}
 
 	public void createRemoteDirectory(final String directory) {
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] data = null;
+			RemoteEntry[] data = null;
 
 			@Override
 			public Object construct() {
-				RemoteFile dir = listParser.createRemoteFile(directory, true);
+				RemoteEntry dir = client.createRemoteFile(directory, true);
 				try {
 					client.createDirectory(dir);
 					data = client.list(remoteFileFilter);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError("<ERROR> " + exp.getMessage());
+					operations.publish(() -> statusWindow.addError("<ERROR> " + exp.getMessage()));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -1006,22 +1026,22 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 
 	public void createRemoteFile(final String file) {
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] data = null;
+			RemoteEntry[] data = null;
 
 			@Override
 			public Object construct() {
-				RemoteFile newFile = listParser.createRemoteFile(file, false);
+				RemoteEntry newFile = client.createRemoteFile(file, false);
 				try {
 					client.createFile(newFile);
 					data = client.list(remoteFileFilter);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError("<ERROR> " + exp.getMessage());
+					operations.publish(() -> statusWindow.addError("<ERROR> " + exp.getMessage()));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -1040,18 +1060,18 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 
 	public void renameRemoteFile(final String fromName, final String toName) {
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] data = null;
+			RemoteEntry[] data = null;
 
 			@Override
 			public Object construct() {
-				RemoteFile from = listParser.createRemoteFile(fromName);
-				RemoteFile to = listParser.createRemoteFile(toName);
+				RemoteEntry from = client.createRemoteFile(fromName);
+				RemoteEntry to = client.createRemoteFile(toName);
 				try {
 					client.rename(from, to);
 					data = client.list(remoteFileFilter);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
 				} catch (Exception exp) {
 					System.err.println(exp);
@@ -1071,12 +1091,12 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		}.start();
 	}
 
-	public void changeRemoteFilePermissions(final RemoteFile oldFile,
-			final RemoteFile newFile, final boolean recursive) {
+	public void changeRemoteFilePermissions(final RemoteEntry oldFile,
+			final RemoteEntry newFile, final boolean recursive) {
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] data = null;
+			RemoteEntry[] data = null;
 
 			@Override
 			public Object construct() {
@@ -1085,19 +1105,19 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 					newAttributes = newAttributes.substring(1);
 					if (recursive) {
 						changeRemoteFilePermissions(oldFile,
-								FTPUtil.parseAttributes(newAttributes));
+								LegacyFtpAdapter.parseAttributes(newAttributes));
 					} else {
 						String fileName = oldFile.getNormalizedPath();
 						// if(fileName.indexOf(' ') > 0) {
 						// fileName = "\"" + fileName + "\"";
 						// }
 						client.executeCommand("SITE CHMOD "
-								+ FTPUtil.parseAttributes(newAttributes) + " "
+								+ LegacyFtpAdapter.parseAttributes(newAttributes) + " "
 								+ fileName);
 					}
 					client.setWorkingDirectory(rwd);
 					data = client.list(remoteFileFilter);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
 				} catch (Exception exp) {
 					System.err.println(exp);
@@ -1117,7 +1137,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		}.start();
 	}
 
-	private void changeRemoteFilePermissions(RemoteFile file, String attributes) {
+	private void changeRemoteFilePermissions(RemoteEntry file, String attributes) {
 		if (client == null || !client.isConnected() || abort) {
 			return;
 		}
@@ -1131,22 +1151,22 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		// }
 		try {
 			client.executeCommand("SITE CHMOD " + attributes + " " + fileName);
-		} catch (FTPException exp) {
+		} catch (ReplyFailure exp) {
 			ftpException(exp);
-		} catch (ConnectionException exp) {
+		} catch (LinkFailure exp) {
 			connectionException(exp);
 		}
 		if (file.isDirectory()) {
-			RemoteFile[] children = null;
+			RemoteEntry[] children = null;
 			try {
 				client.setWorkingDirectory(file);
 				children = client.list(remoteFileFilter);
-			} catch (FTPException exp) {
+			} catch (ReplyFailure exp) {
 				ftpException(exp);
-			} catch (ConnectionException exp) {
+			} catch (LinkFailure exp) {
 				connectionException(exp);
 			} catch (Exception exp) {
-				statusWindow.addError("<ERROR> " + exp);
+				operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 				exp.printStackTrace();
 			}
 			if (children != null) {
@@ -1157,12 +1177,12 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		}
 	}
 
-	public void updateRemoteFile(final RemoteFile oldFile,
-			final RemoteFile newFile) {
+	public void updateRemoteFile(final RemoteEntry oldFile,
+			final RemoteEntry newFile) {
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] data = null;
+			RemoteEntry[] data = null;
 
 			@Override
 			public Object construct() {
@@ -1179,7 +1199,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 					if (!oldAttributes.equals(newAttributes)) {
 						newAttributes = newAttributes.substring(1);
 						client.executeCommand("SITE CHMOD " + newName + " "
-								+ FTPUtil.parseAttributes(newAttributes));
+								+ LegacyFtpAdapter.parseAttributes(newAttributes));
 						reload = true;
 					}
 					if (reload) {
@@ -1204,7 +1224,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	}
 
 	public void deleteRemoteFiles() {
-		final RemoteFile[] selectedFiles = remotePane.getSelectedFiles();
+		final RemoteEntry[] selectedFiles = remotePane.getSelectedFiles();
 		if (selectedFiles == null || selectedFiles.length == 0) {
 			return;
 		}
@@ -1214,9 +1234,9 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			return;
 		}
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
-			RemoteFile[] data = null;
+			RemoteEntry[] data = null;
 
 			@Override
 			public Object construct() {
@@ -1226,12 +1246,12 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 				try {
 					client.setWorkingDirectory(rwd);
 					data = client.list(remoteFileFilter);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError("<ERROR> " + exp);
+					operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -1246,7 +1266,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		}.start();
 	}
 
-	private void delete(RemoteFile file) {
+	private void delete(RemoteEntry file) {
 		if (client == null || !client.isConnected()) {
 			return;
 		}
@@ -1258,7 +1278,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			if (file.isFile()) {
 				client.delete(file);
 			} else if (file.isDirectory()) {
-				RemoteFile[] children = null;
+				RemoteEntry[] children = null;
 				client.setWorkingDirectory(file);
 				children = client.list(remoteFileFilter);
 				for (int i = 0; i < children.length; i++) {
@@ -1267,19 +1287,19 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 				client.setToParentDirectory();
 				client.delete(file);
 			}
-		} catch (FTPException exp) {
+		} catch (ReplyFailure exp) {
 			ftpException(exp);
-		} catch (ConnectionException exp) {
+		} catch (LinkFailure exp) {
 			connectionException(exp);
 		} catch (Exception exp) {
-			statusWindow.addError("<ERROR> " + exp);
+			operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 			exp.printStackTrace();
 		}
 	}
 
 	public void createLocalDirectory(final String dir) {
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
 			LocalFile[] data = null;
 			boolean created = true;
@@ -1312,10 +1332,11 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 
 	public void createLocalFile(final String fileName) {
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
 			LocalFile[] data = null;
 			boolean created = true;
+			Exception error;
 
 			@Override
 			public Object construct() {
@@ -1329,14 +1350,16 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 						data = lwd.list(localFileFilter);
 					}
 				} catch (Exception exp) {
-					GUIUtil.showError(jftp, exp);
+					error = exp;
 				}
 				return null;
 			}
 
 			@Override
 			public void finished() {
-				if (!created) {
+				if (error != null) {
+					GUIUtil.showError(jftp, error);
+				} else if (!created) {
 					GUIUtil.showError(jftp,
 							resources.getString("error.createLocalFile"));
 				} else {
@@ -1379,7 +1402,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 
 		setBusy(true);
 
-		new SwingWorker() {
+		new Worker() {
 
 			LocalFile[] data = null;
 
@@ -1422,18 +1445,18 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			return;
 		}
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
 			@Override
 			public Object construct() {
 				try {
 					client.executeCommand(command);
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError(exp.toString());
+					operations.publish(() -> statusWindow.addError(exp.toString()));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -1452,7 +1475,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			return;
 		}
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
 			@Override
 			public Object construct() {
@@ -1473,12 +1496,12 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 							client.executeCommand(commands[i]);
 						}
 					}
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError(exp.toString());
+					operations.publish(() -> statusWindow.addError(exp.toString()));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -1497,18 +1520,18 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			return;
 		}
 		setBusy(true);
-		new SwingWorker() {
+		new Worker() {
 
 			@Override
 			public Object construct() {
 				try {
 					client.disconnect();
-				} catch (FTPException exp) {
+				} catch (ReplyFailure exp) {
 					ftpException(exp);
-				} catch (ConnectionException exp) {
+				} catch (LinkFailure exp) {
 					connectionException(exp);
 				} catch (Exception exp) {
-					statusWindow.addError("<ERROR> " + exp);
+					operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 					exp.printStackTrace();
 				} finally {
 					return null;
@@ -1518,9 +1541,9 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 			@Override
 			public void finished() {
 				if (timer.isRunning()) {
-					timer.stop();
+					operations.publish(() -> timer.stop());
 				}
-				statusBar.reset();
+				operations.publish(() -> statusBar.reset());
 				bytesTransferred = 0L;
 				timeElapsed = 0;
 				remotePane.clearAll();
@@ -1537,25 +1560,7 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 		return client.isConnected();
 	}
 
-	private void cleanup() {
-		localPane = null;
-		remotePane = null;
-		client = null;
-		listParser = null;
-		lwd = null;
-		rwd = null;
-		statusWindow = null;
-		statusBar = null;
-		timer = null;
-		downloadStatusFormat = null;
-		uploadStatusFormat = null;
-		listStatusFormat = null;
-		splitPane1 = null;
-		splitPane2 = null;
-		remoteHost = null;
-	}
-
-	public File downloadToTempFile(RemoteFile source, boolean monitor) {
+	public File downloadToTempFile(RemoteEntry source, boolean monitor) {
 		if (!source.isFile()) {
 			return null;
 		}
@@ -1565,18 +1570,18 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 					"." + source.getExtension());
 			destination.deleteOnExit();
 		} catch (IOException exp) {
-			statusWindow.addError("<ERROR> " + exp);
+			operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 			exp.printStackTrace();
 			return null;
 		}
 		int type = getTransferType(source.getExtension());
 		Object[] args = { source.getName() };
-		statusBar.setStatus(downloadStatusFormat.format(args));
-		statusBar.setMaximum((int) source.getSize());
+		operations.publish(() -> statusBar.setStatus(downloadStatusFormat.format(args)));
+		operations.publish(() -> statusBar.setMaximum((int) source.getSize()));
 		timeElapsed = 0;
-		timer.start();
+		operations.publish(() -> timer.start());
 		try {
-			client.download(source, destination, type, false);
+			client.download(source, destination, type);
 			if (monitor) {
 				fileChangeMonitor.add(destination);
 				monitoredTransfers.put(destination, new TransferObject(
@@ -1584,25 +1589,25 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 						source));
 			}
 			return destination;
-		} catch (FTPException exp) {
+		} catch (ReplyFailure exp) {
 			ftpException(exp);
 			return null;
-		} catch (ConnectionException exp) {
+		} catch (LinkFailure exp) {
 			connectionException(exp);
 			return null;
 		} catch (Exception exp) {
-			statusWindow.addError("<ERROR> " + exp);
+			operations.publish(() -> statusWindow.addError("<ERROR> " + exp));
 			exp.printStackTrace();
 			return null;
 		} finally {
-			timer.stop();
+			operations.publish(() -> timer.stop());
 			timeElapsed = 0;
-			statusBar.reset();
+			operations.publish(() -> statusBar.reset());
 		}
 	}
 
 	public void updateToolBar() {
-		jftp.updateToolBar();
+		updateOwnToolbar();
 	}
 
 	public void setAbortFlag(boolean abort) {
@@ -1618,15 +1623,15 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	}
 
 	public void setStatus(String status) {
-		statusBar.setStatus(status);
+		operations.publish(() -> statusBar.setStatus(status));
 	}
 
 	public void resetStatusBar() {
-		statusBar.reset();
+		operations.publish(() -> statusBar.reset());
 	}
 
 	public void setProgress(int progress) {
-		statusBar.setProgress(progress);
+		operations.publish(() -> statusBar.setProgress(progress));
 	}
 
 	public void progressChanged(ProgressEvent evt) {
@@ -1636,17 +1641,17 @@ public class FTPSession extends SessionPanel implements FTPConnectionListener,
 	public void beginFile(ZipEvent evt) {
 		Object[] args = { evt.getFile() };
 		if (evt.getType() == ZipEvent.ZIP) {
-			statusBar.setStatus(zipStatusFormat.format(args));
+			operations.publish(() -> statusBar.setStatus(zipStatusFormat.format(args)));
 		} else if (evt.getType() == ZipEvent.UNZIP) {
-			statusBar.setStatus(unzipStatusFormat.format(args));
+			operations.publish(() -> statusBar.setStatus(unzipStatusFormat.format(args)));
 		}
-		progressTimer.start();
+		operations.publish(() -> progressTimer.start());
 	}
 
 	public void endFile(ZipEvent evt) {
-		progressTimer.stop();
+		operations.publish(() -> progressTimer.stop());
 		timeElapsed = 0;
-		statusBar.reset();
+		operations.publish(() -> statusBar.reset());
 	}
 
 	public void selectAllLocalFiles() {

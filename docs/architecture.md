@@ -1,6 +1,6 @@
 # JFTP desktop architecture
 
-These diagrams describe the desktop application at revision `2351f40f2e17b47bb6317820f1eaac828809cd4c`. The source review covers the Maven build, desktop entry point, Swing tabs, primary FTP workflows, and local profile files. The [modernization ADR](ADR/000-main-architecture.md) describes the target architecture.
+The diagrams describe the recovered desktop application at revision `2351f40f2e17b47bb6317820f1eaac828809cd4c`. The source review covers the Maven build, desktop entry point, Swing tabs, primary FTP workflows, and local profile files. The implementation notes describe the changes to session execution and profile storage. [Modernization ADR](ADR/000-main-architecture.md)
 
 ## Components and external boundaries
 
@@ -82,9 +82,15 @@ sequenceDiagram
 
 The assembly puts the application JAR at the package root and dependencies in `lib/`. The historical launchers looked for the JAR under `lib/`. The repaired Windows launcher resolves the root JAR relative to the batch file. [Assembly](../src/main/assembly/binary.xml) · [Windows launcher](../src/main/scripts/jftp.bat) · [Packaged resource index](jftp-runtime-resources.md)
 
+## Transport adapter
+
+Each connection attempt captures the configured endpoint, parser, security mode, data mode, timeout, and buffer size. `LegacyFtpAdapter` loads the configured client and parser. Swing receives JFTP remote entries, typed transport events, and separate failures for server replies and connection errors. The underlying parser still defines path normalization, extension and metadata behavior. The adapter masks password and account values in protocol events and error text. [Adapter](../src/main/java/com/myjavaworld/jftp/LegacyFtpAdapter.java) · [Remote entries](../src/main/java/com/myjavaworld/jftp/RemoteEntry.java) · [Transport evidence](transport-qualification.md)
+
+Each tab owns a `SessionCoordinator`. It queues session work on the Swing event dispatch thread and runs one ordinary operation at a time on a virtual thread. Progress and completion return to the event dispatch thread, where the coordinator checks the originating operation and the session checks the originating connection. Only the selected session updates the shared toolbar. Abort signals the active transfer separately and pauses the start of the next operation until the signal finishes. Closing a tab discards queued work, suppresses late results, and releases the transport off the event dispatch thread. FTPS certificate decisions run on the event dispatch thread while the originating handshake waits on its worker. [Coordinator](../src/main/java/com/myjavaworld/jftp/SessionCoordinator.java) · [Tab ownership](../src/main/java/com/myjavaworld/jftp/FTPSession.java) · [Certificate decisions](../src/main/java/com/myjavaworld/jftp/ssl/JFTPTrustManager.java)
+
 ## Connect a disconnected tab
 
-The sequence follows the Connect dialog into the selected tab. EDT is Swing's event dispatch thread. The worker initializes the client and parser by reflection, then performs the network calls. The diagram shows the normal path and the specific `FTPException` branch around connect and login.
+This baseline sequence follows the Connect dialog into the selected tab. EDT is Swing's event dispatch thread. The diagram shows the normal path and the legacy server-reply branch around connect and login.
 
 [Mermaid source](diagrams/connect-session.mmd) · [SVG](diagrams/connect-session.svg)
 
@@ -219,7 +225,7 @@ Modernized startup resolves the data directory from `.jftp/active-profile`, with
 
 ## Verification
 
-The diagram edges are based on the linked source at the revision above. The [repository map](repo-maps/repo-map.rust.md) and the connection section of the [full Repomix package](repomix/jftp.xml) were used for navigation. The startup ordering and entry-thread boundary follow from the direct calls in `main` and its constructor. FTP library internals, packaged startup, and live application behavior remain unverified.
+The diagram edges are based on the linked source at the recovered revision. The startup ordering and entry-thread boundary follow from the direct calls in `main` and its constructor at that revision. [Repository map](repo-maps/repo-map.rust.md) · [Full Repomix package](repomix/jftp.xml) · [Packaged startup and live verification](testing.md)
 
 All five sources parsed and rendered locally with Mermaid CLI 11.12.0, Mermaid 11.17.2, and headless Chrome 157.0.8103.80. The SVG previews were inspected in Chrome. The Markdown fences match the standalone sources after newline normalization.
 

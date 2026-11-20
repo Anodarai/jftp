@@ -18,7 +18,7 @@ package com.myjavaworld.jftp.actions;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-import com.myjavaworld.ftp.RemoteFile;
+import com.myjavaworld.jftp.RemoteEntry;
 import com.myjavaworld.jftp.FTPSession;
 import com.myjavaworld.jftp.JFTP;
 import com.myjavaworld.jftp.RenameRemoteFileDlg;
@@ -55,7 +55,7 @@ public class RenameRemoteFileAction implements ActionListener {
 		}
 		String fromName = "";
 		String toName = "";
-		RemoteFile from = session.getSelectedRemoteFile();
+		RemoteEntry from = session.getSelectedRemoteFile();
 		if (from != null) {
 			fromName = from.getName();
 		}

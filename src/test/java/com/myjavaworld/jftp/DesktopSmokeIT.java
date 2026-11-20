@@ -1,6 +1,7 @@
 package com.myjavaworld.jftp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -23,9 +24,25 @@ import org.junit.jupiter.api.Test;
 class DesktopSmokeIT {
     @Test
     void exercisesTheExtractedWindowsApplication() throws Exception {
+        exercise("fresh", null);
+    }
+
+    @Test
+    void reconnectsFromAMigratedProfileInTheExtractedApplication() throws Exception {
+        exercise("migrated", null);
+        String previousArchive = System.getProperty("jftp.desktop.previousArchive");
+        if (previousArchive != null) {
+            exercise("restored", Path.of(previousArchive));
+        }
+    }
+
+    private static void exercise(String profile, Path previousArchive) throws Exception {
         assertTrue(System.getProperty("os.name").startsWith("Windows"),
                 "The desktop-qa profile requires an interactive Windows desktop");
         Path evidence = Path.of(System.getProperty("jftp.desktop.logDirectory")).toAbsolutePath();
+        if (!profile.equals("fresh")) {
+            evidence = evidence.resolve(profile);
+        }
         Files.createDirectories(evidence);
         Files.deleteIfExists(evidence.resolve("failure.png"));
         Files.deleteIfExists(evidence.resolve("session.log"));
@@ -34,7 +51,13 @@ class DesktopSmokeIT {
             String appName = System.getProperty("jftp.desktop.appName");
             Path extracted = Files.createDirectory(test.root.resolve("extracted package"));
             extract(archive, extracted);
-            Path appJar = extracted.resolve(appName).resolve(appName + ".jar");
+            Path candidateJar = extracted.resolve(appName).resolve(appName + ".jar");
+            Path appJar = candidateJar;
+            if (previousArchive != null) {
+                Path previous = Files.createDirectory(test.root.resolve("previous package"));
+                extract(previousArchive, previous);
+                appJar = previous.resolve(appName).resolve(appName + ".jar");
+            }
             assertTrue(Files.isRegularFile(appJar), "The ZIP must include its root application JAR");
             Set<String> packagedJars = packagedJars(appJar);
 
@@ -50,7 +73,7 @@ class DesktopSmokeIT {
             Process desktop = new ProcessBuilder(
                     Path.of(System.getProperty("java.home"), "bin", "java.exe").toString(),
                     "-Duser.home=" + home, "-cp", childClasspath, DesktopSmoke.class.getName(),
-                    test.root.toString(), evidence.toString())
+                    test.root.toString(), evidence.toString(), profile, candidateJar.toString())
                     .directory(test.root.toFile())
                     .redirectErrorStream(true)
                     .redirectOutput(rawLog.toFile())
@@ -66,6 +89,8 @@ class DesktopSmokeIT {
                 fail("Native desktop smoke timed out. See " + log);
             }
             assertEquals(0, desktop.exitValue(), "See " + log);
+            assertFalse(output.contains("Exception in thread \"AWT-EventQueue"),
+                    "An EDT callback failed. See " + log);
             assertTrue(Files.isRegularFile(test.root.resolve("complete")),
                     "The app exited before all desktop checks passed. See " + log);
         }

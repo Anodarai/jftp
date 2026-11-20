@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 
 import com.myjavaworld.gui.GUIUtil;
-import com.myjavaworld.gui.SwingWorker;
 import com.myjavaworld.jftp.FTPSession;
 import com.myjavaworld.jftp.JFTP;
 import com.myjavaworld.jftp.LocalFile;
@@ -81,7 +80,8 @@ public class ZipAndUploadAction implements ActionListener {
 		}
 		session.clearAbortFlag();
 		session.setBusy(true);
-		new SwingWorker() {
+		session.new Worker() {
+			Throwable error;
 
 			@Override
 			public Object construct() {
@@ -103,7 +103,7 @@ public class ZipAndUploadAction implements ActionListener {
 						zip.getFile().delete();
 					}
 				} catch (Throwable t) {
-					GUIUtil.showError(jftp, t);
+					error = t;
 				} finally {
 					if (zip != null) {
 						try {
@@ -120,6 +120,9 @@ public class ZipAndUploadAction implements ActionListener {
 			public void finished() {
 				session.setBusy(false);
 				session.resetStatusBar();
+				if (error != null) {
+					GUIUtil.showError(jftp, error);
+				}
 				session.refreshRemotePane();
 				session.refreshLocalPane();
 			}

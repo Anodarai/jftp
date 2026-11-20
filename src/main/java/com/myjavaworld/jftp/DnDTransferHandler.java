@@ -24,7 +24,6 @@ import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.TransferHandler;
 
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.jftp.actions.DownloadAction;
 import com.myjavaworld.jftp.actions.UploadAction;
 
@@ -39,7 +38,7 @@ public class DnDTransferHandler extends TransferHandler {
 	private static final DataFlavor LOCAL_FILE_FLAVOR = new DataFlavor(
 			LocalFile[].class, "localFileList");
 	private static final DataFlavor REMOTE_FILE_FLAVOR = new DataFlavor(
-			RemoteFile[].class, "remoteFileList");
+			RemoteEntry[].class, "remoteFileList");
 	private JFTP jftp = null;
 
 	public DnDTransferHandler(JFTP jftp) {
@@ -143,9 +142,9 @@ public class DnDTransferHandler extends TransferHandler {
 	private class RemoteFileTransferable implements Transferable {
 
 		final DataFlavor[] supportedFlavors = new DataFlavor[] { REMOTE_FILE_FLAVOR };
-		private RemoteFile[] data = null;
+		private RemoteEntry[] data = null;
 
-		public RemoteFileTransferable(RemoteFile[] data) {
+		public RemoteFileTransferable(RemoteEntry[] data) {
 			this.data = data;
 		}
 

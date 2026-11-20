@@ -41,9 +41,7 @@ import javax.swing.JTabbedPane;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
-import com.myjavaworld.ftp.FTPClient;
 import com.myjavaworld.ftp.FTPConstants;
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.gui.GUIUtil;
 import com.myjavaworld.gui.LicenseAgreementDlg;
 import com.myjavaworld.gui.MFrame;
@@ -325,16 +323,15 @@ public class JFTP extends MFrame implements WindowListener, ActionListener,
 		if (session == null || !session.isConnected()) {
 			return;
 		}
-		RemoteFile selectedFile = session.getSelectedRemoteFile();
+		RemoteEntry selectedFile = session.getSelectedRemoteFile();
 		if (selectedFile == null) {
 			return;
 		}
-		FTPClient client = session.getFTPClient();
-		RemoteFilePropertiesDlg dlg = new RemoteFilePropertiesDlg(this, client,
+		RemoteFilePropertiesDlg dlg = new RemoteFilePropertiesDlg(this, session,
 				selectedFile, session.getRemoteFileFilter());
 		dlg.setLocationRelativeTo(this);
 		dlg.setVisible(true);
-		RemoteFile newFile = dlg.getFile();
+		RemoteEntry newFile = dlg.getFile();
 		dlg.dispose();
 		if (newFile != null) {
 			session.changeRemoteFilePermissions(selectedFile, newFile,
@@ -391,7 +388,7 @@ public class JFTP extends MFrame implements WindowListener, ActionListener,
 		dlg.setFilter(session.getRemoteFileFilter());
 		dlg.setLocationRelativeTo(this);
 		dlg.setVisible(true);
-		Filter filter = dlg.getFilter();
+		LegacyFtpAdapter.ListingFilter filter = dlg.getFilter();
 		dlg.dispose();
 		if (filter != null) {
 			session.setRemoteFileFilter(filter);

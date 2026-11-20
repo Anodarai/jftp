@@ -21,7 +21,6 @@ import java.util.ResourceBundle;
 import javax.swing.KeyStroke;
 import javax.swing.event.MenuListener;
 
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.gui.GUIUtil;
 import com.myjavaworld.gui.MMenu;
 import com.myjavaworld.gui.MMenuItem;
@@ -302,7 +301,7 @@ public class RemoteSystemMenu extends MMenu implements MenuListener {
 			selectionCount = session.getRemoteFileSelectionCount();
 		}
 		boolean isFile = false;
-		RemoteFile selectedFile = null;
+		RemoteEntry selectedFile = null;
 		if (selectionCount == 1) {
 			selectedFile = session.getSelectedRemoteFile();
 			isFile = selectedFile.isFile();
@@ -324,7 +323,7 @@ public class RemoteSystemMenu extends MMenu implements MenuListener {
 		miInvertSelection.setEnabled(connected);
 	}
 
-	private boolean isZipFile(RemoteFile file) {
+	private boolean isZipFile(RemoteEntry file) {
 		String ext = file.getExtension();
 		return "ZIP".equalsIgnoreCase(ext);
 	}

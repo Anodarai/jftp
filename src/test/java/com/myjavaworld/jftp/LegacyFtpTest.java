@@ -7,13 +7,19 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.function.UnaryOperator;
 
 import org.apache.ftpserver.DataConnectionConfigurationFactory;
 import org.apache.ftpserver.FtpServer;
 import org.apache.ftpserver.FtpServerFactory;
+import org.apache.ftpserver.command.CommandFactory;
+import org.apache.ftpserver.command.CommandFactoryFactory;
 import org.apache.ftpserver.ftplet.Authority;
 import org.apache.ftpserver.listener.Listener;
 import org.apache.ftpserver.listener.ListenerFactory;
@@ -114,6 +120,39 @@ public class LegacyFtpTest {
 
     static LoopbackServer startServer(Path root, SslConfiguration tls, boolean implicit, Authority... extraPermissions)
             throws Exception {
+        return startServer(root, tls, implicit, null, extraPermissions);
+    }
+
+    static LoopbackServer startServerWithoutList(Path root) throws Exception {
+        return startServer(root, null, false,
+                defaults -> command -> "LIST".equals(command) ? null : defaults.getCommand(command));
+    }
+
+    static LoopbackServer startServerWithHeldList(Path root, CountDownLatch requested, CountDownLatch release)
+            throws Exception {
+        return startServer(root, null, false, defaults -> command -> {
+            var delegate = defaults.getCommand(command);
+            if (!"LIST".equals(command)) {
+                return delegate;
+            }
+            return (session, context, request) -> {
+                requested.countDown();
+                try {
+                    if (!release.await(25, TimeUnit.SECONDS)) {
+                        throw new IOException("The test did not release the held LIST");
+                    }
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException(interrupted);
+                }
+                delegate.execute(session, context, request);
+            };
+        });
+    }
+
+    private static LoopbackServer startServer(Path root, SslConfiguration tls, boolean implicit,
+            UnaryOperator<CommandFactory> configureCommands,
+            Authority... extraPermissions) throws Exception {
         Path incoming = Files.createDirectories(root.resolve("server/incoming"));
         BaseUser account = new BaseUser();
         account.setName(USER);
@@ -126,6 +165,9 @@ public class LegacyFtpTest {
         PropertiesUserManagerFactory users = new PropertiesUserManagerFactory();
         users.setFile(Files.createFile(root.resolve("users.properties")).toFile());
         FtpServerFactory factory = new FtpServerFactory();
+        if (configureCommands != null) {
+            factory.setCommandFactory(configureCommands.apply(new CommandFactoryFactory().createCommandFactory()));
+        }
         factory.setUserManager(users.createUserManager());
         factory.getUserManager().save(account);
         ListenerFactory listeners = new ListenerFactory();
@@ -145,16 +187,22 @@ public class LegacyFtpTest {
 
         FtpServer server = factory.createServer();
         server.start();
-        return new LoopbackServer(server, listener.getPort());
+        return new LoopbackServer(server, listener);
     }
 
     static final class LoopbackServer implements AutoCloseable {
         private final FtpServer server;
+        private final Listener listener;
         final int port;
 
-        private LoopbackServer(FtpServer server, int port) {
+        private LoopbackServer(FtpServer server, Listener listener) {
             this.server = server;
-            this.port = port;
+            this.listener = listener;
+            this.port = listener.getPort();
+        }
+
+        boolean hasActiveSessions() {
+            return !listener.getActiveSessions().isEmpty();
         }
 
         @Override

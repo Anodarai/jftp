@@ -1,5 +1,6 @@
 package com.myjavaworld.jftp;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -7,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -95,13 +97,61 @@ class LegacyFtpsTest {
             } finally {
                 client.close();
             }
-            assertEquals(mode == Mode.FALLBACK || mode == Mode.OPPORTUNISTIC || mode == Mode.EXPLICIT,
-                    commands.contains("AUTH SSL"), commands::toString);
-            assertEquals(mode.tls, commands.contains("PBSZ 0"), commands::toString);
-            assertEquals(mode.tls, commands.contains("PROT P"), commands::toString);
-            assertTrue(passive ? commands.contains("PASV") : commands.stream().anyMatch(value -> value.startsWith("PORT ")),
-                    () -> dataPath + ": " + commands);
+            checkNegotiation(mode, dataPath, passive, commands);
         }
+    }
+
+    @ParameterizedTest(name = "{0}, {1} through JFTP adapter")
+    @MethodSource("transportModes")
+    void transfersThroughTheAdapterUsingTheSameSecurityPolicy(Mode mode, String dataPath, boolean passive)
+            throws Exception {
+        try (TestDirectory directory = new TestDirectory();
+                LegacyFtpTest.LoopbackServer server = LegacyFtpTest.startServer(directory.root,
+                        mode.tls ? certificate.serverConfiguration() : null, mode == Mode.IMPLICIT)) {
+            RemoteHost site = new RemoteHost("127.0.0.1", server.port, "test-operator", "synthetic-ftp-password", "");
+            site.setPassive(passive);
+            site.setSSLUsage(mode.usage);
+            if (mode == Mode.IMPLICIT) {
+                site.setImplicitSSLPort(server.port);
+            }
+            var ssl = mode.usage == FTPConstants.USE_NO_SSL ? null : certificate.trustedClientContext();
+            List<String> commands = new ArrayList<>();
+            try (var transport = LegacyFtpAdapter.create(LegacyFtpAdapter.Endpoint.capture(site), 5_000, 8192, ssl,
+                    event -> {
+                        if (event.kind() == LegacyFtpAdapter.EventKind.COMMAND) {
+                            commands.add(event.message().strip());
+                        }
+                    })) {
+                transport.connect();
+                transport.setWorkingDirectory(transport.createRemoteFile("/incoming"));
+                RemoteEntry workingDirectory = transport.getWorkingDirectory();
+                assertEquals("/incoming", workingDirectory.getPath());
+                byte[] payload = {0, 13, 10, -1, 26, 42};
+                Path upload = Files.write(directory.root.resolve("upload.bin"), payload);
+                RemoteEntry target = transport.createRemoteFile(workingDirectory, "sample.bin");
+                transport.upload(upload.toFile(), target, FTPConstants.TYPE_BINARY);
+                assertArrayEquals(payload, Files.readAllBytes(directory.root.resolve("server/incoming/sample.bin")));
+                RemoteEntry[] listing = transport.list(null);
+                assertEquals(1, listing.length);
+                assertEquals("sample.bin", listing[0].getName());
+                assertEquals(payload.length, listing[0].getSize());
+                Path download = directory.root.resolve("download.bin");
+                transport.download(listing[0], download.toFile(), FTPConstants.TYPE_BINARY);
+                assertArrayEquals(payload, Files.readAllBytes(download));
+                transport.disconnect();
+                assertFalse(transport.isConnected());
+            }
+            checkNegotiation(mode, dataPath, passive, commands);
+        }
+    }
+
+    private static void checkNegotiation(Mode mode, String dataPath, boolean passive, List<String> commands) {
+        assertEquals(mode == Mode.FALLBACK || mode == Mode.OPPORTUNISTIC || mode == Mode.EXPLICIT,
+                commands.contains("AUTH SSL"), commands::toString);
+        assertEquals(mode.tls, commands.contains("PBSZ 0"), commands::toString);
+        assertEquals(mode.tls, commands.contains("PROT P"), commands::toString);
+        assertTrue(passive ? commands.contains("PASV") : commands.stream().anyMatch(value -> value.startsWith("PORT ")),
+                () -> dataPath + ": " + commands);
     }
 
     @Test
