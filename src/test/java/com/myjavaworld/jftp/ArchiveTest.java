@@ -1,5 +1,12 @@
 package com.myjavaworld.jftp;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -7,12 +14,14 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
+import org.junit.jupiter.api.Test;
+
 import com.myjavaworld.util.RegexFilter;
 import com.myjavaworld.zip.Unzip;
 import com.myjavaworld.zip.Zip;
-import junit.framework.TestCase;
 
-public class ArchiveTest extends TestCase {
+public class ArchiveTest {
+    @Test
     public void testFilteredZipKeepsRelativePathsAndRestoresBytes() throws Exception {
         try (TestDirectory directory = new TestDirectory()) {
             Path input = Files.createDirectory(directory.root.resolve("input"));
@@ -56,6 +65,7 @@ public class ArchiveTest extends TestCase {
         }
     }
 
+    @Test
     public void testInvalidArchiveLeavesDestinationEmpty() throws Exception {
         try (TestDirectory directory = new TestDirectory()) {
             Path archive = Files.write(directory.root.resolve("invalid.zip"), new byte[] {1, 2, 3});

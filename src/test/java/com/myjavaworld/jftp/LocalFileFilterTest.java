@@ -1,5 +1,9 @@
 package com.myjavaworld.jftp;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.DosFileAttributeView;
@@ -10,11 +14,13 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
+import org.junit.jupiter.api.Test;
+
 import com.myjavaworld.util.DateFilter;
 import com.myjavaworld.util.RegexFilter;
-import junit.framework.TestCase;
 
-public class LocalFileFilterTest extends TestCase {
+public class LocalFileFilterTest {
+    @Test
     public void testInclusionAndExclusionKeepDirectoriesNavigable() throws Exception {
         try (TestDirectory directory = new TestDirectory()) {
             long cutoff = 1_700_000_000_000L;
@@ -37,6 +43,7 @@ public class LocalFileFilterTest extends TestCase {
         }
     }
 
+    @Test
     public void testHiddenAttributeParticipatesInFilter() throws Exception {
         try (TestDirectory directory = new TestDirectory()) {
             Path hidden = Files.createFile(directory.root.resolve(".draft.txt"));

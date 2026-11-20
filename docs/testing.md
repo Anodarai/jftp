@@ -1,8 +1,8 @@
-# JFTP baseline tests
+# JFTP tests
 
-Run `mvn test` from the repository root. The suite was verified on Windows 11 x64 with Eclipse Adoptium JDK 25.0.4.1 and Maven 3.9.16. The initial run downloads dependencies from Maven Central and the jMethods HTTPS repository. The tests use the existing JUnit 3 dependency and bind a real test FTP server to IPv4 loopback on an ephemeral port.
+Run `.\mvnw.cmd test` from the repository root with the [pinned Windows toolchain](build-and-dependencies.md#pinned-windows-toolchain). The initial run downloads dependencies from Maven Central and the jMethods HTTPS repository. Tests bind a real FTP server to IPv4 loopback on an ephemeral port.
 
-The baseline build uses Maven Compiler Plugin 3.14.1, Surefire 3.5.4, and Java 8 bytecode. It excludes `OSXAdapterOld.java`, which directly imports the Apple EAWT API and has no callers in the desktop entry point. JDK 25 reports the expected obsolete Java 8 target warning. [Build configuration](../pom.xml)
+The recovered baseline used JUnit 3.8.1, Eclipse Adoptium JDK 25.0.4.1, and Maven 3.9.16 to emit Java 8 bytecode. The desktop build excludes `OSXAdapterOld.java`, which directly imports the Apple EAWT API and has no callers in the desktop entry point. [Build configuration](../pom.xml)
 
 | Area | Coverage |
 | --- | --- |
@@ -73,3 +73,9 @@ Native QA used the extracted `jftp.bat` from another working directory with sepa
 | Favorite and transfers | The saved site connected to Apache MINA FtpServer 1.2.1 on IPv4 loopback and listed `/incoming`. F9 uploaded `upload.bin` and F7 downloaded `download.bin`. The destination listings refreshed and source and destination SHA-256 matched for both files. F4 cleared the remote listing. [Favorite](qa/screens/toolchain-favorite.jpg) · [Transfers](qa/screens/toolchain-transfers.jpg) · [Disconnected](qa/screens/toolchain-disconnected.jpg) |
 
 Upload SHA-256 was `fc745af96e9674102571aeb7ddf3fd82c7ce457352569c801bf8e620fb2a797b`. Download SHA-256 was `bba3057854925e69b0be9275ce165edbab3fd09b62dc5a1fcc4b84e25f7f3e9d`. The server logged binary mode, successful `STOR` and `RETR` replies, and a normal disconnect. The four app launches produced no output beyond the JVM notices for the synthetic-home setting.
+
+## Jupiter runner verification
+
+Surefire 3.5.4 selected its JUnit Platform provider for Jupiter 6.1.3. A temporary failing assertion in the locale fallback test produced exit code 1 and reported exactly 10 tests with one assertion failure and zero errors. After removing the probe, `.\mvnw.cmd clean verify` reported 10 passing tests with no skips. Both frozen favorites fixtures retained the hashes above.
+
+The resolved tree contains Jupiter API, Params, and Engine 6.1.3 with Platform Commons and Engine 6.1.3. FTPServer 1.2.1, Ftplet 1.2.1, MINA 2.2.4, and SLF4J 1.7.36 remain test-scoped. One MINA session-close callback was rejected during server teardown after successful transfers and `QUIT`. The ZIP still contained only the application, FTP API, and JavaHelp JARs. [Dependency inventory](build-and-dependencies.md)

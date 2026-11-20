@@ -32,4 +32,4 @@ The desktop compiler emits Java 25 class files and excludes `OSXAdapterOld.java`
 | Packaged FTP API 3.0.0 JAR | `496782add046e211b5f7a686c483522cca8879048f12286249aa50c8f86b505c` |
 | Packaged JavaHelp 2.0.05 JAR | `fcf4922d38ff85184f1d2328317bb60826e14da948abd606ee3d5b8c6a70debd` |
 
-The build pins Clean 3.2.0, Resources 3.4.0, Compiler 3.14.1, Surefire 3.5.4, JAR 3.4.2, Source 3.3.1, Assembly 3.7.1, and Install 3.1.4. The FTP API and JavaHelp checksums match the recovered baseline. Use the [modernization plan](modernization-plan.md) to sequence any subsequent transport and JavaHelp work.
+The build pins Clean 3.2.0, Resources 3.4.0, Compiler 3.14.1, Surefire 3.5.4, JAR 3.4.2, Source 3.3.1, Assembly 3.7.1, and Install 3.1.4. The FTP API and JavaHelp checksums match the recovered baseline. The active test runner is Jupiter 6.1.3 on the JUnit Platform. [Runner verification](testing.md#jupiter-runner-verification) · [Modernization plan](modernization-plan.md)

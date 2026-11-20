@@ -1,5 +1,11 @@
 package com.myjavaworld.jftp;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.StreamCorruptedException;
@@ -15,10 +21,12 @@ import java.util.concurrent.TimeUnit;
 
 import javax.crypto.SealedObject;
 
-import com.myjavaworld.ftp.FTPConstants;
-import junit.framework.TestCase;
+import org.junit.jupiter.api.Test;
 
-public class ProfilePersistenceTest extends TestCase {
+import com.myjavaworld.ftp.FTPConstants;
+
+public class ProfilePersistenceTest {
+    @Test
     public void testPreferencesAndLegacyFavoritesInIsolatedJvm() throws Exception {
         // JFTP initializes its static profile path on first use.
         try (TestDirectory directory = new TestDirectory()) {
@@ -40,8 +48,8 @@ public class ProfilePersistenceTest extends TestCase {
                 child.destroyForcibly().waitFor(5, TimeUnit.SECONDS);
                 fail("The isolated profile test timed out");
             }
-            assertEquals(new String(Files.readAllBytes(log), StandardCharsets.UTF_8),
-                    0, child.exitValue());
+            assertEquals(0, child.exitValue(),
+                    new String(Files.readAllBytes(log), StandardCharsets.UTF_8));
         }
     }
 
@@ -89,8 +97,8 @@ public class ProfilePersistenceTest extends TestCase {
         copyFixture("favorites-baseline-sealed.ser", file);
         byte[] sealedBytes = Files.readAllBytes(file);
         assertLegacySite(FavoritesManager.getFavorites());
-        assertTrue("Reopening sealed favorites should preserve the file",
-                Arrays.equals(sealedBytes, Files.readAllBytes(file)));
+        assertTrue(Arrays.equals(sealedBytes, Files.readAllBytes(file)),
+                "Reopening sealed favorites should preserve the file");
 
         byte[] corruptBytes = {1, 2, 3, 4};
         Files.write(file, corruptBytes);
@@ -104,7 +112,7 @@ public class ProfilePersistenceTest extends TestCase {
 
     private static void copyFixture(String name, Path file) throws Exception {
         try (InputStream fixture = ProfilePersistenceTest.class.getResourceAsStream(name)) {
-            assertNotNull("Missing serialized baseline fixture " + name, fixture);
+            assertNotNull(fixture, "Missing serialized baseline fixture " + name);
             Files.copy(fixture, file, StandardCopyOption.REPLACE_EXISTING);
         }
     }
@@ -116,8 +124,8 @@ public class ProfilePersistenceTest extends TestCase {
         assertEquals("ftp.example.invalid", site.getHostName());
         assertEquals(2121, site.getPort());
         assertEquals("fixture-operator", site.getUser());
-        assertTrue("The saved password should round-trip",
-                "synthetic-test-value".equals(site.getPassword()));
+        assertTrue("synthetic-test-value".equals(site.getPassword()),
+                "The saved password should round-trip");
         assertEquals("fixture-account", site.getAccount());
         assertEquals("sample folder", site.getInitialLocalDirectory());
         assertEquals("/incoming", site.getInitialRemoteDirectory());

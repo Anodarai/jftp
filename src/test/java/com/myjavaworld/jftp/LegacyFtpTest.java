@@ -1,5 +1,10 @@
 package com.myjavaworld.jftp;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -13,6 +18,7 @@ import org.apache.ftpserver.listener.ListenerFactory;
 import org.apache.ftpserver.usermanager.PropertiesUserManagerFactory;
 import org.apache.ftpserver.usermanager.impl.BaseUser;
 import org.apache.ftpserver.usermanager.impl.WritePermission;
+import org.junit.jupiter.api.Test;
 
 import com.myjavaworld.ftp.DefaultFTPClient;
 import com.myjavaworld.ftp.DefaultListParser;
@@ -21,21 +27,23 @@ import com.myjavaworld.ftp.FTPConstants;
 import com.myjavaworld.ftp.FTPException;
 import com.myjavaworld.ftp.ListParser;
 import com.myjavaworld.ftp.RemoteFile;
-import junit.framework.TestCase;
 
-public class LegacyFtpTest extends TestCase {
+public class LegacyFtpTest {
     private static final String HOST = "127.0.0.1";
     private static final String USER = "test-operator";
     private static final String PASSWORD = "synthetic-ftp-password";
 
+    @Test
     public void testPassiveBinaryUploadListAndDownload() throws Exception {
         checkBinaryTransfer(true);
     }
 
+    @Test
     public void testActiveBinaryUploadListAndDownload() throws Exception {
         checkBinaryTransfer(false);
     }
 
+    @Test
     public void testServerRejectsWrongPassword() throws Exception {
         try (TestDirectory directory = new TestDirectory();
                 LoopbackServer server = startServer(directory.root)) {
@@ -75,8 +83,9 @@ public class LegacyFtpTest extends TestCase {
                 Path upload = Files.write(directory.root.resolve("upload.bin"), payload);
                 RemoteFile target = parser.createRemoteFile(workingDirectory, "sample.bin");
                 client.upload(upload.toFile(), target, FTPConstants.TYPE_BINARY, false, 0L);
-                assertTrue("Bytes on the server", Arrays.equals(payload,
-                        Files.readAllBytes(directory.root.resolve("server/incoming/sample.bin"))));
+                assertTrue(Arrays.equals(payload,
+                        Files.readAllBytes(directory.root.resolve("server/incoming/sample.bin"))),
+                        "Bytes on the server");
 
                 RemoteFile[] listing = client.list();
                 assertEquals(1, listing.length);
@@ -84,8 +93,8 @@ public class LegacyFtpTest extends TestCase {
                 assertEquals(payload.length, listing[0].getSize());
                 Path download = directory.root.resolve("download.bin");
                 client.download(listing[0], download.toFile(), FTPConstants.TYPE_BINARY, false);
-                assertTrue("Bytes downloaded from the server",
-                        Arrays.equals(payload, Files.readAllBytes(download)));
+                assertTrue(Arrays.equals(payload, Files.readAllBytes(download)),
+                        "Bytes downloaded from the server");
                 client.disconnect();
                 assertFalse(client.isConnected());
             } finally {
