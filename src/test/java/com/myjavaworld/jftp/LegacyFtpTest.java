@@ -15,6 +15,7 @@ import org.apache.ftpserver.FtpServer;
 import org.apache.ftpserver.FtpServerFactory;
 import org.apache.ftpserver.listener.Listener;
 import org.apache.ftpserver.listener.ListenerFactory;
+import org.apache.ftpserver.ssl.SslConfiguration;
 import org.apache.ftpserver.usermanager.PropertiesUserManagerFactory;
 import org.apache.ftpserver.usermanager.impl.BaseUser;
 import org.apache.ftpserver.usermanager.impl.WritePermission;
@@ -73,37 +74,43 @@ public class LegacyFtpTest {
             client.setTimeout(5_000);
             client.setPassive(passive);
             try {
-                client.connect(HOST, server.port);
-                client.login(USER, PASSWORD);
-                client.setWorkingDirectory(parser.createRemoteFile("/incoming"));
-                RemoteFile workingDirectory = client.getWorkingDirectory();
-                assertEquals("/incoming", workingDirectory.getPath());
-
-                byte[] payload = {0, 13, 10, -1, 26, 42};
-                Path upload = Files.write(directory.root.resolve("upload.bin"), payload);
-                RemoteFile target = parser.createRemoteFile(workingDirectory, "sample.bin");
-                client.upload(upload.toFile(), target, FTPConstants.TYPE_BINARY, false, 0L);
-                assertTrue(Arrays.equals(payload,
-                        Files.readAllBytes(directory.root.resolve("server/incoming/sample.bin"))),
-                        "Bytes on the server");
-
-                RemoteFile[] listing = client.list();
-                assertEquals(1, listing.length);
-                assertEquals("sample.bin", listing[0].getName());
-                assertEquals(payload.length, listing[0].getSize());
-                Path download = directory.root.resolve("download.bin");
-                client.download(listing[0], download.toFile(), FTPConstants.TYPE_BINARY, false);
-                assertTrue(Arrays.equals(payload, Files.readAllBytes(download)),
-                        "Bytes downloaded from the server");
-                client.disconnect();
-                assertFalse(client.isConnected());
+                checkBinaryTransfer(directory.root, server.port, client, parser);
             } finally {
                 client.close();
             }
         }
     }
 
+    static void checkBinaryTransfer(Path root, int port, FTPClient client, ListParser parser) throws Exception {
+        client.connect(HOST, port);
+        client.login(USER, PASSWORD);
+        client.setWorkingDirectory(parser.createRemoteFile("/incoming"));
+        RemoteFile workingDirectory = client.getWorkingDirectory();
+        assertEquals("/incoming", workingDirectory.getPath());
+
+        byte[] payload = {0, 13, 10, -1, 26, 42};
+        Path upload = Files.write(root.resolve("upload.bin"), payload);
+        RemoteFile target = parser.createRemoteFile(workingDirectory, "sample.bin");
+        client.upload(upload.toFile(), target, FTPConstants.TYPE_BINARY, false, 0L);
+        assertTrue(Arrays.equals(payload, Files.readAllBytes(root.resolve("server/incoming/sample.bin"))),
+                "Bytes on the server");
+
+        RemoteFile[] listing = client.list();
+        assertEquals(1, listing.length);
+        assertEquals("sample.bin", listing[0].getName());
+        assertEquals(payload.length, listing[0].getSize());
+        Path download = root.resolve("download.bin");
+        client.download(listing[0], download.toFile(), FTPConstants.TYPE_BINARY, false);
+        assertTrue(Arrays.equals(payload, Files.readAllBytes(download)), "Bytes downloaded from the server");
+        client.disconnect();
+        assertFalse(client.isConnected());
+    }
+
     static LoopbackServer startServer(Path root) throws Exception {
+        return startServer(root, null, false);
+    }
+
+    static LoopbackServer startServer(Path root, SslConfiguration tls, boolean implicit) throws Exception {
         Path incoming = Files.createDirectories(root.resolve("server/incoming"));
         BaseUser account = new BaseUser();
         account.setName(USER);
@@ -119,6 +126,10 @@ public class LegacyFtpTest {
         ListenerFactory listeners = new ListenerFactory();
         listeners.setServerAddress(HOST);
         listeners.setPort(0);
+        if (tls != null) {
+            listeners.setSslConfiguration(tls);
+            listeners.setImplicitSsl(implicit);
+        }
         DataConnectionConfigurationFactory data = new DataConnectionConfigurationFactory();
         data.setPassiveAddress(HOST);
         data.setActiveLocalAddress(HOST);
