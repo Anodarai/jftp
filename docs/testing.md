@@ -79,3 +79,17 @@ Upload SHA-256 was `fc745af96e9674102571aeb7ddf3fd82c7ce457352569c801bf8e620fb2a
 Surefire 3.5.4 selected its JUnit Platform provider for Jupiter 6.1.3. A temporary failing assertion in the locale fallback test produced exit code 1 and reported exactly 10 tests with one assertion failure and zero errors. After removing the probe, `.\mvnw.cmd clean verify` reported 10 passing tests with no skips. Both frozen favorites fixtures retained the hashes above.
 
 The resolved tree contains Jupiter API, Params, and Engine 6.1.3 with Platform Commons and Engine 6.1.3. FTPServer 1.2.1, Ftplet 1.2.1, MINA 2.2.4, and SLF4J 1.7.36 remain test-scoped. One MINA session-close callback was rejected during server teardown after successful transfers and `QUIT`. The ZIP still contained only the application, FTP API, and JavaHelp JARs. [Dependency inventory](build-and-dependencies.md)
+
+## Automated Windows desktop smoke
+
+Run the opt-in Failsafe suite on an unlocked Windows desktop with the pinned toolchain. Keep the test window in the foreground during the run.
+
+```powershell
+.\mvnw.cmd -Pdesktop-qa clean verify
+```
+
+The suite extracts the ZIP to a path with spaces, loads its application JAR and manifest libraries, isolates `user.home`, and uses Apache MINA FtpServer on IPv4 loopback. It drives the displayed controls with AWT mouse, key, and window events. The managed Windows session returned `0,0` when Robot tried to move the OS pointer to the test menu. The event driver exercises Swing's control dispatch in the realized windows, and the native-input checks above cover physical input routing.
+
+The test waits for startup, Contents and Index, required-host validation and focus return, cancellation, rejected login with reply 530, a successful favorite connection, the refreshed upload and download listings, matching file bytes, and disconnect. It bounds each UI wait and the whole child process. A deliberate assertion produced a nonzero Failsafe result, an application-only screenshot, and redacted logs. The passing run completed the desktop test in 9.5 seconds. [Failure capture probe](qa/screens/native-desktop-diagnostics.png)
+
+Reports are under `target/failsafe-reports`. The application and server log is `target/desktop-qa/desktop.log`. Failed tests also retain the redacted session log and, when a window rendered, its PNG in the same directory. The server reported the expected rejection and successful transfers. JVM shutdown printed one “Exception while removing reference.” line after the successful `QUIT`, with no stack trace and exit code 0.

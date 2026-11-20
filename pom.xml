@@ -228,4 +228,34 @@
 			</extension>
 		</extensions>
 	</build>
+	<profiles>
+		<profile>
+			<id>desktop-qa</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-failsafe-plugin</artifactId>
+						<version>3.5.4</version>
+						<configuration>
+							<failIfNoTests>true</failIfNoTests>
+							<systemPropertyVariables>
+								<jftp.desktop.archive>${project.build.directory}/${project.build.finalName}-bin.zip</jftp.desktop.archive>
+								<jftp.desktop.appName>${project.build.finalName}</jftp.desktop.appName>
+								<jftp.desktop.logDirectory>${project.build.directory}/desktop-qa</jftp.desktop.logDirectory>
+							</systemPropertyVariables>
+						</configuration>
+						<executions>
+							<execution>
+								<goals>
+									<goal>integration-test</goal>
+									<goal>verify</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>
