@@ -26,7 +26,6 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -42,9 +41,7 @@ import javax.swing.JTabbedPane;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
-import com.myjavaworld.ftp.FTPClient;
 import com.myjavaworld.ftp.FTPConstants;
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.gui.GUIUtil;
 import com.myjavaworld.gui.LicenseAgreementDlg;
 import com.myjavaworld.gui.MFrame;
@@ -65,8 +62,7 @@ public class JFTP extends MFrame implements WindowListener, ActionListener,
 	private static ResourceBundle resources = null;
 	public static final File USER_HOME = new File(
 			System.getProperty("user.home"));
-	public static final File DATA_HOME = new File(USER_HOME, ".jftp"
-			+ File.separator + "data");
+	public static final File DATA_HOME = ProfileStorage.desktopData(USER_HOME.toPath()).toFile();
 	private static final Map THEMES;
 	private static final Map PARSERS;
 	private static final Map CLIENTS;
@@ -327,16 +323,15 @@ public class JFTP extends MFrame implements WindowListener, ActionListener,
 		if (session == null || !session.isConnected()) {
 			return;
 		}
-		RemoteFile selectedFile = session.getSelectedRemoteFile();
+		RemoteEntry selectedFile = session.getSelectedRemoteFile();
 		if (selectedFile == null) {
 			return;
 		}
-		FTPClient client = session.getFTPClient();
-		RemoteFilePropertiesDlg dlg = new RemoteFilePropertiesDlg(this, client,
+		RemoteFilePropertiesDlg dlg = new RemoteFilePropertiesDlg(this, session,
 				selectedFile, session.getRemoteFileFilter());
 		dlg.setLocationRelativeTo(this);
 		dlg.setVisible(true);
-		RemoteFile newFile = dlg.getFile();
+		RemoteEntry newFile = dlg.getFile();
 		dlg.dispose();
 		if (newFile != null) {
 			session.changeRemoteFilePermissions(selectedFile, newFile,
@@ -393,7 +388,7 @@ public class JFTP extends MFrame implements WindowListener, ActionListener,
 		dlg.setFilter(session.getRemoteFileFilter());
 		dlg.setLocationRelativeTo(this);
 		dlg.setVisible(true);
-		Filter filter = dlg.getFilter();
+		LegacyFtpAdapter.ListingFilter filter = dlg.getFilter();
 		dlg.dispose();
 		if (filter != null) {
 			session.setRemoteFileFilter(filter);
@@ -511,17 +506,12 @@ public class JFTP extends MFrame implements WindowListener, ActionListener,
 	 */
 	public static synchronized void savePreferences(JFTPPreferences prefs)
 			throws IOException {
-		ObjectOutputStream out = null;
-		try {
-			File prefsFile = new File(DATA_HOME, "preferences.ser");
-			out = new ObjectOutputStream(new FileOutputStream(prefsFile));
-			out.writeObject(prefs);
-			transferTypes = prefs.getTransferTypes();
-		} finally {
-			if (out != null) {
-				out.close();
+		ProfileStorage.writeActive(DATA_HOME.toPath().resolve(LegacyProfile.PREFERENCES), output -> {
+			try (ObjectOutputStream stream = new ObjectOutputStream(output)) {
+				stream.writeObject(prefs);
 			}
-		}
+		});
+		transferTypes = prefs.getTransferTypes();
 	}
 
 	/**
@@ -542,9 +532,8 @@ public class JFTP extends MFrame implements WindowListener, ActionListener,
 			if (!DATA_HOME.exists()) {
 				DATA_HOME.mkdirs();
 			}
-			File prefsFile = new File(DATA_HOME, "preferences.ser");
+			File prefsFile = new File(DATA_HOME, LegacyProfile.PREFERENCES);
 			if (!prefsFile.exists()) {
-				prefsFile.createNewFile();
 				savePreferences(new JFTPPreferences());
 			}
 			fin = new FileInputStream(prefsFile);

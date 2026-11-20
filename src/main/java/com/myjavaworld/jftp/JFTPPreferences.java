@@ -38,10 +38,8 @@ import com.myjavaworld.util.SystemUtil;
 public class JFTPPreferences implements Serializable {
 
 	private static final long serialVersionUID = 4316033315068041786L;
-	private static final String DEFAULT_SERVER_CERTIFICATE_STORE = JFTP.DATA_HOME
-			+ File.separator + "serverCertificates.jks";
-	private static final String DEFAULT_CLIENT_CERTIFICATE_STORE = JFTP.DATA_HOME
-			+ File.separator + "clientCertificates.jks";
+	static final String SERVER_CERTIFICATE_STORE_NAME = "serverCertificates.jks";
+	static final String CLIENT_CERTIFICATE_STORE_NAME = "clientCertificates.jks";
 	private static final char[] DEFAULT_CERTIFICATE_STORE_PASSWORD = "changeit"
 			.toCharArray();
 	private static final int DEFAULT_SOCKS_PROXY_PORT = 1080;
@@ -132,8 +130,8 @@ public class JFTPPreferences implements Serializable {
 		useJavaWindows = false;
 		toolBarType = 0;
 
-		serverCertificateStore = DEFAULT_SERVER_CERTIFICATE_STORE;
-		clientCertificateStore = DEFAULT_CLIENT_CERTIFICATE_STORE;
+		serverCertificateStore = getServerCertificateStore(JFTP.DATA_HOME);
+		clientCertificateStore = getClientCertificateStore(JFTP.DATA_HOME);
 		serverCertificateStorePassword = DEFAULT_CERTIFICATE_STORE_PASSWORD;
 		clientCertificateStorePassword = DEFAULT_CERTIFICATE_STORE_PASSWORD;
 
@@ -283,8 +281,12 @@ public class JFTPPreferences implements Serializable {
 	}
 
 	public String getServerCertificateStore() {
+		return getServerCertificateStore(JFTP.DATA_HOME);
+	}
+
+	String getServerCertificateStore(File dataHome) {
 		if (serverCertificateStore == null) {
-			return DEFAULT_SERVER_CERTIFICATE_STORE;
+			return new File(dataHome, SERVER_CERTIFICATE_STORE_NAME).getPath();
 		}
 		return serverCertificateStore;
 	}
@@ -294,8 +296,12 @@ public class JFTPPreferences implements Serializable {
 	}
 
 	public String getClientCertificateStore() {
+		return getClientCertificateStore(JFTP.DATA_HOME);
+	}
+
+	String getClientCertificateStore(File dataHome) {
 		if (clientCertificateStore == null) {
-			return DEFAULT_CLIENT_CERTIFICATE_STORE;
+			return new File(dataHome, CLIENT_CERTIFICATE_STORE_NAME).getPath();
 		}
 		return clientCertificateStore;
 	}

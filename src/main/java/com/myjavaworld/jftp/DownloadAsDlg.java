@@ -28,7 +28,6 @@ import java.util.ResourceBundle;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.gui.GUIUtil;
 import com.myjavaworld.gui.MButton;
 import com.myjavaworld.gui.MDialog;
@@ -51,10 +50,10 @@ public class DownloadAsDlg extends MDialog implements ActionListener {
 	private MButton butDownload = null;
 	private MButton butCancel = null;
 	private MButton butHelp = null;
-	private RemoteFile remoteFile = null;
+	private RemoteEntry remoteFile = null;
 	private boolean approved = false;
 
-	public DownloadAsDlg(JFTP jftp, RemoteFile remoteFile) {
+	public DownloadAsDlg(JFTP jftp, RemoteEntry remoteFile) {
 		super(jftp);
 		this.remoteFile = remoteFile;
 		setTitle(resources.getString("title.dialog"));

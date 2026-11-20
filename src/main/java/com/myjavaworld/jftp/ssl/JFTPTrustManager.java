@@ -15,6 +15,7 @@
  */
 package com.myjavaworld.jftp.ssl;
 
+import java.awt.EventQueue;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -22,6 +23,9 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.function.BooleanSupplier;
 
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
@@ -40,6 +44,7 @@ public class JFTPTrustManager implements X509TrustManager {
 	private String hostName = null;
 	private X509TrustManager tm = null;
 	private X509Certificate[] chain = null;
+	private final BooleanSupplier live;
 
 	/**
 	 * Creates a new instance of <code>JFTPTrustManager</code>.
@@ -54,11 +59,12 @@ public class JFTPTrustManager implements X509TrustManager {
 	 * @throws NoSuchAlgorithmException
 	 * 
 	 */
-	public JFTPTrustManager(JFTP jftp, String hostName)
+	public JFTPTrustManager(JFTP jftp, String hostName, BooleanSupplier live)
 			throws KeyStoreException, NoSuchAlgorithmException {
 		super();
 		this.jftp = jftp;
 		this.hostName = hostName;
+		this.live = live;
 		TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
 		tmf.init(KeyStoreManager.getServerCertificateStore());
 		tm = (X509TrustManager) tmf.getTrustManagers()[0];
@@ -87,7 +93,7 @@ public class JFTPTrustManager implements X509TrustManager {
 		boolean trusted = isTrusted(chain);
 
 		if (!validDate || !validHost || !trusted) {
-			int userOption = SecurityWarningDlg.showDialog(jftp, chain,
+			int userOption = requestDecision(chain,
 					validDate, validHost, trusted);
 			if (userOption != SecurityWarningDlg.YES_OPTION) {
 				throw new CertificateException("No trusted certificate found. ");
@@ -95,6 +101,27 @@ public class JFTPTrustManager implements X509TrustManager {
 			this.chain = chain;
 		} else {
 			this.chain = chain;
+		}
+	}
+
+	private int requestDecision(X509Certificate[] chain, boolean validDate, boolean validHost, boolean trusted)
+			throws CertificateException {
+		FutureTask<Integer> decision = new FutureTask<>(() -> live.getAsBoolean()
+				? SecurityWarningDlg.showDialog(jftp, chain, validDate, validHost, trusted)
+				: SecurityWarningDlg.NO_OPTION);
+		if (EventQueue.isDispatchThread()) {
+			decision.run();
+		} else {
+			EventQueue.invokeLater(decision);
+		}
+		try {
+			return decision.get();
+		} catch (InterruptedException interrupted) {
+			decision.cancel(false);
+			Thread.currentThread().interrupt();
+			throw new CertificateException("Certificate decision interrupted", interrupted);
+		} catch (ExecutionException failed) {
+			throw new CertificateException("Certificate decision failed", failed.getCause());
 		}
 	}
 

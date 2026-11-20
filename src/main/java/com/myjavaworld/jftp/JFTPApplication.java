@@ -63,6 +63,12 @@ public class JFTPApplication {
 	}
 
 	public static void main(String args[]) {
+		if (args.length > 0 && "--inspect-profile".equals(args[0])) {
+			System.exit(LegacyProfile.inspect(args, System.out, System.err));
+		}
+		if (args.length > 0 && ("--migrate-profile".equals(args[0]) || "--restore-profile".equals(args[0]))) {
+			System.exit(ProfileMigration.run(args, System.in, System.out, System.err));
+		}
 		new JFTPApplication();
 	}
 

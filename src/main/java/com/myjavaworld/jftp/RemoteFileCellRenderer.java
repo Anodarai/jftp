@@ -20,11 +20,10 @@ import java.awt.Component;
 import javax.swing.Icon;
 import javax.swing.JTable;
 
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.gui.MTableCellRenderer;
 
 /**
- * A table cell renderer used to render <code>RemoteFile</code> objects.
+ * A table cell renderer used to render <code>RemoteEntry</code> objects.
  * 
  * @author Sai Pullabhotla, psai [at] jMethods [dot] com
  * @version 2.0
@@ -51,7 +50,7 @@ public class RemoteFileCellRenderer extends MTableCellRenderer {
 			setText("");
 			setIcon(null);
 		} else {
-			RemoteFile file = (RemoteFile) value;
+			RemoteEntry file = (RemoteEntry) value;
 			setText(file.getName());
 			setIcon(file.isDirectory() ? directoryIcon : fileIcon);
 		}

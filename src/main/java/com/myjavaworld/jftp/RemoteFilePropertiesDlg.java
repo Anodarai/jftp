@@ -37,16 +37,13 @@ import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.SwingConstants;
 
-import com.myjavaworld.ftp.FTPClient;
-import com.myjavaworld.ftp.RemoteFile;
 import com.myjavaworld.gui.MButton;
 import com.myjavaworld.gui.MCheckBox;
 import com.myjavaworld.gui.MDialog;
 import com.myjavaworld.gui.MLabel;
 import com.myjavaworld.gui.MLabelTextField;
-import com.myjavaworld.gui.SwingWorker;
 import com.myjavaworld.util.CommonResources;
-import com.myjavaworld.util.Filter;
+import com.myjavaworld.jftp.LegacyFtpAdapter.ListingFilter;
 import com.myjavaworld.util.ResourceLoader;
 
 /**
@@ -58,9 +55,10 @@ public class RemoteFilePropertiesDlg extends MDialog implements ActionListener {
 	private static ResourceBundle resources = ResourceLoader
 			.getBundle("com.myjavaworld.jftp.RemoteFilePropertiesDlg");
 	private static final String HELP_ID = "remote.properties";
-	private FTPClient client = null;
-	private RemoteFile file = null;
-	private RemoteFile newFile = null;
+	private LegacyFtpAdapter client = null;
+	private final FTPSession session;
+	private RemoteEntry file = null;
+	private RemoteEntry newFile = null;
 	private MLabelTextField tfFileName = null;
 	private MLabelTextField tfSite = null;
 	private MLabelTextField tfFullPath = null;
@@ -89,14 +87,15 @@ public class RemoteFilePropertiesDlg extends MDialog implements ActionListener {
 	private int dirCount = 0;
 	private int fileCount = 0;
 	private long totalSize = 0L;
-	private boolean closing = false;
+	private volatile boolean closing = false;
 	private boolean approved = false;
-	private Filter filter = null;
+	private ListingFilter filter = null;
 
-	public RemoteFilePropertiesDlg(Frame parent, FTPClient client,
-			RemoteFile file, Filter filter) {
+	public RemoteFilePropertiesDlg(Frame parent, FTPSession session,
+			RemoteEntry file, ListingFilter filter) {
 		super(parent, "", true);
-		this.client = client;
+		this.session = session;
+		this.client = session.getTransport();
 		this.file = file;
 		this.filter = filter;
 		sizeFormatter = new MessageFormat(resources.getString("value.size"));
@@ -110,7 +109,7 @@ public class RemoteFilePropertiesDlg extends MDialog implements ActionListener {
 		pack();
 	}
 
-	public RemoteFile getFile() {
+	public RemoteEntry getFile() {
 		if (approved) {
 			return newFile;
 		}
@@ -147,14 +146,17 @@ public class RemoteFilePropertiesDlg extends MDialog implements ActionListener {
 		fileCount = 0;
 		totalSize = 0L;
 		closing = false;
-		SwingWorker worker = new SwingWorker() {
+		FTPSession.Worker worker = session.new Worker() {
 
 			@Override
 			public Object construct() {
 				try {
-					RemoteFile workingDir = client.getWorkingDirectory();
-					computeSizeAndContents(file);
-					client.setWorkingDirectory(workingDir);
+					RemoteEntry workingDir = client.getWorkingDirectory();
+					try {
+						computeSizeAndContents(file);
+					} finally {
+						client.setWorkingDirectory(workingDir);
+					}
 				} catch (Exception exp) {
 					System.err.println(exp);
 				}
@@ -163,7 +165,9 @@ public class RemoteFilePropertiesDlg extends MDialog implements ActionListener {
 
 			@Override
 			public void finished() {
-				updateSizeAndContents();
+				if (!closing && isDisplayable()) {
+					updateSizeAndContents();
+				}
 			}
 		};
 		worker.start();
@@ -179,7 +183,7 @@ public class RemoteFilePropertiesDlg extends MDialog implements ActionListener {
 		}
 	}
 
-	private void computeSizeAndContents(RemoteFile file) {
+	private void computeSizeAndContents(RemoteEntry file) {
 		if (closing) {
 			return;
 		}
@@ -197,14 +201,18 @@ public class RemoteFilePropertiesDlg extends MDialog implements ActionListener {
 			totalSize += file.getSize();
 			try {
 				client.setWorkingDirectory(file);
-				RemoteFile[] children = client.list(filter);
+				RemoteEntry[] children = client.list(filter);
 				if (children == null) {
 					return;
 				}
 				for (int i = 0; i < children.length; i++) {
 					computeSizeAndContents(children[i]);
 				}
-				updateSizeAndContents();
+				session.publishUi(() -> {
+					if (!closing && isDisplayable()) {
+						updateSizeAndContents();
+					}
+				});
 			} catch (Exception exp) {
 				System.err.println(exp);
 			}
@@ -229,7 +237,7 @@ public class RemoteFilePropertiesDlg extends MDialog implements ActionListener {
 			attributes += cbPublicWrite.isSelected() ? 'w' : '-';
 			attributes += cbPublicExecute.isSelected() ? 'x' : '-';
 		}
-		newFile = client.getListParser().createRemoteFile(newFileName);
+		newFile = client.createRemoteFile(newFileName);
 		newFile.setAttributes(attributes);
 		close();
 	}

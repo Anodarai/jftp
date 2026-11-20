@@ -17,13 +17,15 @@ package com.myjavaworld.jftp.ssl;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.cert.Certificate;
 import java.util.Enumeration;
 
 import com.myjavaworld.jftp.JFTP;
+import com.myjavaworld.jftp.ProfileStorage;
 
 /**
  * @author Sai Pullabhotla, psai [at] jMethods [dot] com
@@ -302,21 +304,17 @@ public class KeyStoreManager {
 	 */
 	private static synchronized void saveCertificateStore(File file,
 			char[] password, KeyStore keyStore) throws KeyStoreException {
-		FileOutputStream fout = null;
 		try {
-			fout = new FileOutputStream(file);
-			keyStore.store(fout, password);
-		} catch (Exception exp) {
-			throw new KeyStoreException("Failed to save the certificate "
-					+ "store: " + file);
-		} finally {
-			if (fout != null) {
+			ProfileStorage.writeActive(file.toPath(), output -> {
 				try {
-					fout.close();
-				} catch (Exception exp) {
+					keyStore.store(output, password);
+				} catch (GeneralSecurityException failure) {
+					throw new IOException(failure);
 				}
-				fout = null;
-			}
+			});
+		} catch (IOException exp) {
+			throw new KeyStoreException("Failed to save the certificate "
+					+ "store: " + file, exp);
 		}
 	}
 }

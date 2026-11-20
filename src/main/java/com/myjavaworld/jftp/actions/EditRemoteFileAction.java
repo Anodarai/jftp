@@ -20,9 +20,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 
-import com.myjavaworld.ftp.RemoteFile;
+import com.myjavaworld.jftp.RemoteEntry;
 import com.myjavaworld.gui.GUIUtil;
-import com.myjavaworld.gui.SwingWorker;
 import com.myjavaworld.jftp.FTPSession;
 import com.myjavaworld.jftp.JFTP;
 
@@ -57,13 +56,13 @@ public class EditRemoteFileAction implements ActionListener {
 			return;
 		}
 
-		final RemoteFile selectedFile = session.getSelectedRemoteFile();
+		final RemoteEntry selectedFile = session.getSelectedRemoteFile();
 		if (selectedFile == null || selectedFile.isDirectory()) {
 			return;
 		}
 		session.clearAbortFlag();
 		session.setBusy(true);
-		new SwingWorker() {
+		session.new Worker() {
 
 			private File tempFile = null;
 

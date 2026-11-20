@@ -38,7 +38,6 @@ import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JPanel;
 
-import com.myjavaworld.ftp.RemoteFileFilter;
 import com.myjavaworld.gui.GUIUtil;
 import com.myjavaworld.gui.MButton;
 import com.myjavaworld.gui.MCheckBox;
@@ -48,7 +47,7 @@ import com.myjavaworld.gui.MRadioButton;
 import com.myjavaworld.gui.MTextField;
 import com.myjavaworld.util.CommonResources;
 import com.myjavaworld.util.DateFilter;
-import com.myjavaworld.util.Filter;
+import com.myjavaworld.jftp.LegacyFtpAdapter.ListingFilter;
 import com.myjavaworld.util.RegexFilter;
 import com.myjavaworld.util.ResourceLoader;
 
@@ -99,12 +98,12 @@ public class RemoteFileFilterDlg extends MDialog implements ActionListener {
 	/**
 	 * @param filter
 	 */
-	public void setFilter(Filter filter) {
+	public void setFilter(ListingFilter filter) {
 		if (filter != null) {
-			RemoteFileFilter rff = (RemoteFileFilter) filter;
-			radioExclusionFilter.setSelected(rff.isExclusionFilter());
-			RegexFilter regexFilter = rff.getRegexFilter();
-			DateFilter dateFilter = rff.getDateFilter();
+			ListingFilter rff = filter;
+			radioExclusionFilter.setSelected(rff.exclusion());
+			RegexFilter regexFilter = rff.name();
+			DateFilter dateFilter = rff.date();
 			if (regexFilter != null) {
 				tfRegexFilter.setText(regexFilter.getPattern().pattern());
 				cbCaseSensitive
@@ -126,12 +125,12 @@ public class RemoteFileFilterDlg extends MDialog implements ActionListener {
 	/**
 	 * @return
 	 */
-	public Filter getFilter() {
+	public ListingFilter getFilter() {
 		if (!approved) {
 			return null;
 		}
 		try {
-			return new RemoteFileFilter(getRegexFilter(), getDateFilter(),
+			return new ListingFilter(getRegexFilter(), getDateFilter(),
 					radioExclusionFilter.isSelected());
 		} catch (Exception exp) {
 			return null;

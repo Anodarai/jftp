@@ -18,7 +18,6 @@ package com.myjavaworld.jftp.actions;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-import com.myjavaworld.gui.SwingWorker;
 import com.myjavaworld.jftp.FTPSession;
 import com.myjavaworld.jftp.JFTP;
 import com.myjavaworld.jftp.LocalFile;
@@ -69,7 +68,7 @@ public class UploadAsAction implements ActionListener {
 		System.gc();
 		session.clearAbortFlag();
 		session.setBusy(true);
-		new SwingWorker() {
+		session.new Worker() {
 
 			@Override
 			public Object construct() {

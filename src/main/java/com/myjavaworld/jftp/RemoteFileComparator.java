@@ -17,11 +17,10 @@ package com.myjavaworld.jftp;
 
 import java.util.Comparator;
 
-import com.myjavaworld.ftp.RemoteFile;
 
 /**
  * An implementation of <code>Comparator</code> interface used to compare
- * <code>RemoteFile</code> objects. This class provides various sort crteria
+ * <code>RemoteEntry</code> objects. This class provides various sort crteria
  * such as compare by name, size, date etc.
  * 
  * @author Sai Pullabhotla, psai [at] jMethods [dot] com
@@ -69,8 +68,8 @@ public class RemoteFileComparator implements Comparator {
 	}
 
 	public int compare(Object o1, Object o2) {
-		RemoteFile r1 = (RemoteFile) o1;
-		RemoteFile r2 = (RemoteFile) o2;
+		RemoteEntry r1 = (RemoteEntry) o1;
+		RemoteEntry r2 = (RemoteEntry) o2;
 		if (compareBy == COMPARE_BY_NAME) {
 			return compareByName(r1, r2);
 		} else if (compareBy == COMPARE_BY_SIZE) {
@@ -82,7 +81,7 @@ public class RemoteFileComparator implements Comparator {
 		}
 	}
 
-	private int compareByName(RemoteFile r1, RemoteFile r2) {
+	private int compareByName(RemoteEntry r1, RemoteEntry r2) {
 		int retVal = 0;
 		if (r1.isDirectory() && !r2.isDirectory()) {
 			retVal = -1;
@@ -95,7 +94,7 @@ public class RemoteFileComparator implements Comparator {
 		return order == ASC_ORDER ? retVal : -retVal;
 	}
 
-	private int compareBySize(RemoteFile r1, RemoteFile r2) {
+	private int compareBySize(RemoteEntry r1, RemoteEntry r2) {
 		int retVal = 0;
 		if (r1.isDirectory() && !r2.isDirectory()) {
 			retVal = -1;
@@ -115,7 +114,7 @@ public class RemoteFileComparator implements Comparator {
 		return order == ASC_ORDER ? retVal : -retVal;
 	}
 
-	private int compareByDate(RemoteFile r1, RemoteFile r2) {
+	private int compareByDate(RemoteEntry r1, RemoteEntry r2) {
 		int retVal = 0;
 		if (r1.isDirectory() && !r2.isDirectory()) {
 			retVal = -1;
@@ -131,7 +130,7 @@ public class RemoteFileComparator implements Comparator {
 		return order == ASC_ORDER ? retVal : -retVal;
 	}
 
-	private int compareByType(RemoteFile r1, RemoteFile r2) {
+	private int compareByType(RemoteEntry r1, RemoteEntry r2) {
 		int retVal = 0;
 		if (r1.isDirectory() && !r2.isDirectory()) {
 			retVal = -1;

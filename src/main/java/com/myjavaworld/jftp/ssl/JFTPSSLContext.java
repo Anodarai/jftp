@@ -19,6 +19,7 @@ import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
+import java.util.function.BooleanSupplier;
 
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
@@ -34,12 +35,12 @@ import com.myjavaworld.jftp.JFTP;
  */
 public class JFTPSSLContext {
 
-	public static SSLContext getSSLContext(JFTP jftp, String hostName)
+	public static SSLContext getSSLContext(JFTP jftp, String hostName, BooleanSupplier live)
 			throws KeyManagementException, KeyStoreException,
 			NoSuchAlgorithmException, UnrecoverableKeyException {
 		SSLContext ctx = SSLContext.getInstance("SSL");
 		ctx.init(new KeyManager[] { new JFTPKeyManager() },
-				new TrustManager[] { new JFTPTrustManager(jftp, hostName) },
+				new TrustManager[] { new JFTPTrustManager(jftp, hostName, live) },
 				null);
 		return ctx;
 	}
