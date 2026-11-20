@@ -88,19 +88,20 @@ Run the opt-in Failsafe suite on an unlocked Windows desktop with the pinned too
 .\mvnw.cmd -Pdesktop-qa clean verify
 ```
 
-The suite extracts the ZIP to a path with spaces, loads its application JAR and manifest libraries, isolates `user.home`, and uses Apache MINA FtpServer on IPv4 loopback. It drives the displayed controls with AWT mouse, key, and window events. The managed Windows session returned `0,0` when Robot tried to move the OS pointer to the test menu. The event driver exercises Swing's control dispatch in the realized windows, and the native-input checks above cover physical input routing.
+The suite extracts the ZIP to a path with spaces, loads its application JAR and manifest libraries, isolates `user.home`, and uses Apache MINA FtpServer on IPv4 loopback. It drives the displayed controls with AWT mouse, key, and window events. The managed Windows session returned `0,0` when Robot tried to move the OS pointer to the test menu. The event driver exercises Swing's control dispatch in the realized windows. The separate native Manual QA gate covers physical input routing for each runtime change.
 
-The test waits for startup, Contents and Index, required-host validation and focus return, cancellation, rejected login with reply 530, a successful favorite connection, the refreshed upload and download listings, matching file bytes, and disconnect. It bounds each UI wait and the whole child process. A deliberate assertion produced a nonzero Failsafe result, an application-only screenshot, and redacted logs. The passing run completed the desktop test in 9.5 seconds. [Failure capture probe](qa/screens/native-desktop-diagnostics.png)
+The test waits for startup, Contents and Index, required-host validation and focus return, cancellation, rejected login with reply 530, a successful favorite connection, refreshed upload and download listings, matching file bytes, and disconnect. It exercises alternate transfer names, ZIP upload, FTPS certificate decisions, transfer abort, and session isolation. It bounds each UI wait and the whole child process. A deliberate assertion in the original harness produced a nonzero Failsafe result, an application-only screenshot, and redacted logs. [Failure capture probe](qa/screens/native-desktop-diagnostics.png)
 
-Reports are under `target/failsafe-reports`. The application and server log is `target/desktop-qa/desktop.log`. Failed tests also retain the redacted session log and, when a window rendered, its PNG in the same directory. The server reported the expected rejection and successful transfers. JVM shutdown printed one “Exception while removing reference.” line after the successful `QUIT`, with no stack trace and exit code 0.
+Reports are under `target/failsafe-reports`. The application and server log is `target/desktop-qa/desktop.log`. Failed tests also retain the redacted session log and an application-only PNG once the harness verifies that the displayed local pane belongs to the synthetic fixture. The original harness run reported the expected login rejection and successful transfers. JVM shutdown printed one “Exception while removing reference.” line after the successful `QUIT`, with no stack trace and exit code 0.
 
 ## Loopback FTP and FTPS compatibility
 
 `LegacyFtpsTest` runs in the default Maven test suite. On Windows with Oracle JDK 25.0.5.1 and its default TLS policy, FTP API 3.0.0 passed active and passive transfers against MINA FtpServer 1.2.1 in five configurations. It exercised plain FTP, FTP fallback after the server declined `AUTH SSL`, TLS when available, explicit FTPS, and implicit FTPS. The server used a temporary self-signed loopback certificate, and the client trusted it for the test. The TLS cases checked `PBSZ 0` and `PROT P`. The test compared upload and download bytes with the original payload, whose SHA-256 is `fc745af96e9674102571aeb7ddf3fd82c7ce457352569c801bf8e620fb2a797b`.
 
-All 11 cases passed, including the separate connection-refusal check. MINA logged passive-port cleanup warnings and reported an unsent TLS reply after a successful `QUIT`. Certificate prompts, SOCKS, and transfer abort remain separate release checks. [Transport acceptance criteria](ADR/001-session-and-ftp-boundary.md#technical-acceptance-criteria)
+The 11 direct-library cases passed, including the separate connection-refusal check. MINA logged passive-port cleanup warnings and reported an unsent TLS reply after a successful `QUIT`. The test repeats the ten data-path cases through `LegacyFtpAdapter` using the same server fixture and negotiation assertions. Certificate prompts, SOCKS, and transfer abort have separate checks. [Transport qualification](transport-qualification.md) · [Transport acceptance criteria](ADR/001-session-and-ftp-boundary.md#technical-acceptance-criteria)
 
 ## Read-only legacy profile inspection
+
 From a clean extraction, use the application JAR with the qualified JDK to inspect a selected legacy data directory.
 
 ```powershell
@@ -133,3 +134,26 @@ java -jar .\jftp-5.0.2-SNAPSHOT.jar --restore-profile "C:\test\legacy home" "<ge
 The extracted-package rehearsal used a legacy profile written by the recovered client. Cancellation left the marker absent, activation and retry selected the same generation, both backup hashes matched the retained original, and restore switched to legacy and back. The migrated profile reported the saved loopback favorite count. Windows integration tests also held the marker open without delete sharing to interrupt atomic replacement, held preferences open to reject a save, and compared source and backup bytes. Those two scenarios use the pinned JDK's Windows-only `NOSHARE_DELETE` test option, which produces a test compilation warning. [Profile recovery criteria](ADR/002-profile-storage-and-migration.md#technical-acceptance-criteria)
 
 The packaged desktop suite now runs with a fresh synthetic profile and a migrated one. The migration variant confirms the selected generation at startup, connects using the migrated favorite, and compares the original plaintext favorites bytes after the desktop session. Its logs and failure captures are under `target/desktop-qa/migrated/`.
+
+## Release build and rollback rehearsal
+
+From a clean Windows source directory, run the pinned wrapper with the previous verified ZIP supplied as an absolute path. Then check the new archive with the package verification script.
+
+```powershell
+.\mvnw.cmd -Pdesktop-qa "-Djftp.desktop.previousArchive=C:\test\previous package\jftp-5.0.2-SNAPSHOT-bin.zip" clean verify
+.\src\test\scripts\Test-WindowsPackage.ps1 -Archive .\target\jftp-5.0.2-SNAPSHOT-bin.zip -ExpectedJavaRelease 25
+Get-FileHash -Algorithm SHA256 .\target\jftp-5.0.2-SNAPSHOT-bin.zip
+```
+
+The optional rollback smoke migrates another synthetic legacy profile using the new JAR, restores `legacy`, and compares the retained original and backup bytes. It starts the previous archive in a fresh JVM with that same home and checks the restored local directory, bundled Help, and a saved-site connection to a real loopback server. Rollback output is under `target/desktop-qa/restored/`. [Release gate](modernization-plan.md#7-qualify-the-release-candidate)
+
+On 2026-11-20, a clean source export on Windows 11 Pro x64 25H2 build 26200 passed 44 Surefire tests and two Failsafe tests with the recovered ZIP supplied for rollback. The clean and migrated profiles passed the packaged desktop scenarios. The recovered package started with the restored settings and its favorite listed the synthetic `rollback.bin` on loopback. `Test-WindowsPackage.ps1` confirmed Java 25 bytecode, launcher startup through `JAVA_HOME` and `PATH`, and missing-Java diagnostics. The manifest named the root application entry point and the same two runtime JARs as the recovered package. Both runtime JAR checksums and all 377 packaged resource contents matched the recovered baseline. [Pinned versions and dependency checksums](build-and-dependencies.md#pinned-windows-toolchain)
+
+| Archive | SHA-256 |
+| --- | --- |
+| Windows candidate ZIP | `40632dfe5fa01b44f0b660331cee1f5cc9d27642c633287e8a04f1b2e16e3d68` |
+| Recovered ZIP used for rollback | `40bfcbf70bd2c5692c709f639b1fa63895e5c6509bd925e325f6fd72eee87d40` |
+
+Both archives and the build and desktop logs were retained locally under `target/release-qualification/`. Upload SHA-256 was `fc745af96e9674102571aeb7ddf3fd82c7ce457352569c801bf8e620fb2a797b` and download SHA-256 was `bba3057854925e69b0be9275ce165edbab3fd09b62dc5a1fcc4b84e25f7f3e9d`. The server logged the expected `certificate_unknown` alert for Decline, reply 530 for rejected credentials, reply 502 for the disabled listing, and reply 426 for interrupted transfers. No uncaught Swing event-dispatch exception appeared. Build warnings covered the legacy applet, the Windows test-only share flag, and attachment of the loose assembly directory.
+
+The native check launched the candidate from a different working directory with an isolated English home. One disconnected tab appeared with its synthetic local fixture, and F1 opened Contents. The operator stopped desktop control at that point. Native connection, transfer and certificate decisions, migrated profile and rollback checks, and their `docs/qa/screens` evidence remain open. [Manual QA requirements](../AGENTS.md#manual-qa)

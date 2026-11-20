@@ -10,6 +10,7 @@ The [product requirements](PRD.md) describe the existing Swing desktop client. T
 | [Build and dependencies](build-and-dependencies.md) | Baseline versions, development and packaged startup, and dependency decisions |
 | [Runtime resources](jftp-runtime-resources.md) | Bundles, icons and JavaHelp needed by the app |
 | [Testing](testing.md) | Executable regression suite, fixture provenance and Windows QA |
+| [Transport qualification](transport-qualification.md) | Observed FTP, FTPS, certificate, SOCKS, and abort behavior on Windows |
 | [Accepted architecture decisions](ADR/000-main-architecture.md) | Windows delivery, session and FTP boundary, and profile migration |
 | [RepoMap](repo-maps/repo-map.rust.md) and [Repomix](repomix/README.md) | Source navigation and historical context |
 
