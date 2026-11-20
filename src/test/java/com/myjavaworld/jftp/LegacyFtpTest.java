@@ -7,12 +7,14 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 
 import org.apache.ftpserver.DataConnectionConfigurationFactory;
 import org.apache.ftpserver.FtpServer;
 import org.apache.ftpserver.FtpServerFactory;
+import org.apache.ftpserver.ftplet.Authority;
 import org.apache.ftpserver.listener.Listener;
 import org.apache.ftpserver.listener.ListenerFactory;
 import org.apache.ftpserver.ssl.SslConfiguration;
@@ -110,13 +112,16 @@ public class LegacyFtpTest {
         return startServer(root, null, false);
     }
 
-    static LoopbackServer startServer(Path root, SslConfiguration tls, boolean implicit) throws Exception {
+    static LoopbackServer startServer(Path root, SslConfiguration tls, boolean implicit, Authority... extraPermissions)
+            throws Exception {
         Path incoming = Files.createDirectories(root.resolve("server/incoming"));
         BaseUser account = new BaseUser();
         account.setName(USER);
         account.setPassword(PASSWORD);
         account.setHomeDirectory(incoming.getParent().toString());
-        account.setAuthorities(Collections.singletonList(new WritePermission()));
+        List<Authority> permissions = new ArrayList<>(List.of(extraPermissions));
+        permissions.add(new WritePermission());
+        account.setAuthorities(permissions);
 
         PropertiesUserManagerFactory users = new PropertiesUserManagerFactory();
         users.setFile(Files.createFile(root.resolve("users.properties")).toFile());

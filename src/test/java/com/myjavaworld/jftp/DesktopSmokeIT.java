@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -59,7 +60,8 @@ class DesktopSmokeIT {
                 desktop.destroyForcibly().waitFor(10, TimeUnit.SECONDS);
             }
             Path log = evidence.resolve("desktop.log");
-            Files.writeString(log, DesktopSmoke.redact(Files.readString(rawLog)));
+            String output = new String(Files.readAllBytes(rawLog), StandardCharsets.UTF_8);
+            Files.writeString(log, DesktopSmoke.redact(output));
             if (!finished) {
                 fail("Native desktop smoke timed out. See " + log);
             }

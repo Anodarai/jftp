@@ -29,3 +29,7 @@ Run `mvnw.cmd -Dtest=LegacySocksTest test` to repeat the three cases.
 ## Certificate decision
 
 The extracted Windows desktop smoke connected to a real explicit FTPS listener using an untrusted, valid loopback certificate. The Security Warning identified the unknown issuer. No caused a handshake failure and left the tab disconnected. A new connection showed the warning again. Yes allowed login and the protected `/incoming` listing. The initialized server trust store remained empty after No and its bytes were identical after Yes. The same scenarios passed with the recovered package. [Desktop smoke](testing.md#automated-windows-desktop-smoke)
+
+## Multi-file abort and tab isolation baseline
+
+The Windows smoke used a MINA account limited to 16 KiB/s download speed. The first tab remained logged in with its original listing while a second tab received reply 530, recovered through a valid favorite, and began downloading two selected files. The test switched to the first tab while the second tab's first file was partial, confirmed the first tab was usable, then returned to the second tab and pressed F12. The second tab reported the abort and the server returned reply 426 for the interrupted transfer. The second file never started. The first tab's listing and log stayed intact. This automated probe passed with the recovered package.
