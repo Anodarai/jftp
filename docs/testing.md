@@ -99,3 +99,37 @@ Reports are under `target/failsafe-reports`. The application and server log is `
 `LegacyFtpsTest` runs in the default Maven test suite. On Windows with Oracle JDK 25.0.5.1 and its default TLS policy, FTP API 3.0.0 passed active and passive transfers against MINA FtpServer 1.2.1 in five configurations. It exercised plain FTP, FTP fallback after the server declined `AUTH SSL`, TLS when available, explicit FTPS, and implicit FTPS. The server used a temporary self-signed loopback certificate, and the client trusted it for the test. The TLS cases checked `PBSZ 0` and `PROT P`. The test compared upload and download bytes with the original payload, whose SHA-256 is `fc745af96e9674102571aeb7ddf3fd82c7ce457352569c801bf8e620fb2a797b`.
 
 All 11 cases passed, including the separate connection-refusal check. MINA logged passive-port cleanup warnings and reported an unsent TLS reply after a successful `QUIT`. Certificate prompts, SOCKS, and transfer abort remain separate release checks. [Transport acceptance criteria](ADR/001-session-and-ftp-boundary.md#technical-acceptance-criteria)
+
+## Read-only legacy profile inspection
+From a clean extraction, use the application JAR with the qualified JDK to inspect a selected legacy data directory.
+
+```powershell
+java -jar "C:\test\extracted package\jftp-5.0.2-SNAPSHOT\jftp-5.0.2-SNAPSHOT.jar" --inspect-profile "C:\test\legacy home\.jftp\data"
+```
+
+The command reports the preferences locale, site count, and the paths, aliases, and entry types for both certificate stores. It exits with code 1 for missing preferences, malformed or unsupported serialized input, unreadable files, or a store password error. An absent favorites file or certificate store is reported as missing. The command resolves unset store paths relative to the selected data directory and reads configured paths as the desktop would from the same working directory. It reads the selected profile without initializing the desktop profile. The deserialization filter also applies to the stream inside sealed favorites. [Profile decision](ADR/002-profile-storage-and-migration.md)
+
+The Windows tests copied both frozen favorites forms alongside a synthetic preferences fixture created with the recovered Java 8 bytecode package at `0f163a4`. The [preferences fixture](../src/test/resources/com/myjavaworld/jftp/preferences-baseline.ser) has SHA-256 `4418e52b42eba9f36f313e31fa5e2e501a40936c38bd319f91241c4127cf37a7`, selects Traditional Chinese, and leaves both certificate locations at their defaults. The tests generate a trusted certificate entry in the server JKS and a key entry in the client JKS. They compare all four source hashes before and after inspecting both formats, check that the operator home remains untouched, and verify the missing, corrupt, unsupported, nested serialization, and wrong-password cases.
+
+The extracted JAR also reported both generated certificate entries with both favorites formats, preserved all four SHA-256 hashes, and rejected a corrupt favorites file with exit code 1. The operator home remained untouched.
+
+## Profile migration and recovery
+
+Point the extracted JAR at the synthetic user home containing `.jftp\data`. Review the source hashes, paths, backup destinations and retained external stores printed before confirmation.
+
+```powershell
+java -jar .\jftp-5.0.2-SNAPSHOT.jar --migrate-profile "C:\test\legacy home"
+```
+
+Enter `yes` to confirm. Any other response cancels. Add `--copy-server-store` or `--copy-client-store` to include a configured external JKS in the generation and its backup. Default stores are copied into the generation when present. External references without a copy option retain their resolved paths. The two stores keep distinct names and formats.
+
+The verified copies and their recovery record are in `.jftp\backups\<generation>`. The desktop reads `.jftp\active-profile` at startup and uses the selected directory under `.jftp\generations`. The desktop's preferences, favorites, and JKS saves share the profile write lock and use atomic file replacement. Reopen the desktop after switching generations so it loads the selected profile.
+
+```powershell
+java -jar .\jftp-5.0.2-SNAPSHOT.jar --restore-profile "C:\test\legacy home" legacy
+java -jar .\jftp-5.0.2-SNAPSHOT.jar --restore-profile "C:\test\legacy home" "<generation>"
+```
+
+The extracted-package rehearsal used a legacy profile written by the recovered client. Cancellation left the marker absent, activation and retry selected the same generation, both backup hashes matched the retained original, and restore switched to legacy and back. The migrated profile reported the saved loopback favorite count. Windows integration tests also held the marker open without delete sharing to interrupt atomic replacement, held preferences open to reject a save, and compared source and backup bytes. Those two scenarios use the pinned JDK's Windows-only `NOSHARE_DELETE` test option, which produces a test compilation warning. [Profile recovery criteria](ADR/002-profile-storage-and-migration.md#technical-acceptance-criteria)
+
+The packaged desktop suite now runs with a fresh synthetic profile and a migrated one. The migration variant confirms the selected generation at startup, connects using the migrated favorite, and compares the original plaintext favorites bytes after the desktop session. Its logs and failure captures are under `target/desktop-qa/migrated/`.
