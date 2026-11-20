@@ -41,4 +41,14 @@ The native Windows check started the extracted JAR directly from a different wor
 
 The application process logs were empty. The session and server logs recorded the expected authentication failure and successful transfers.
 
-The bundled batch launcher refers to the application JAR under `lib\`. Launcher qualification, FTPS and certificate decisions, proxy connections, transfer abort, and automated native UI flows remain follow-up coverage. [Windows launcher](../src/main/scripts/jftp.bat) · [Modernization gates](ADR/000-main-architecture.md#10-testing-strategy)
+## Windows launcher recovery
+
+On Windows 11 x64, rebuilding with Temurin 25.0.4.1 and Maven 3.9.16 passed all 10 baseline tests. The same package check against an archive containing the previous launcher failed with “Unable to access jarfile” because the launcher looked under `lib/`. The rebuilt ZIP passed the following check with both Temurin 25.0.4.1 and Oracle JDK 25.0.5.1.
+
+```powershell
+.\src\test\scripts\Test-WindowsPackage.ps1 -Archive .\target\jftp-5.0.2-SNAPSHOT-bin.zip
+```
+
+The script extracts to a path with spaces and calls the launcher from a different working directory. It checks startup with `JAVA_HOME` and with only the JDK on `PATH`. An invalid `JAVA_HOME` and missing Java on `PATH` each produce an actionable diagnostic and exit code 1. It uses headless mode for these command-line checks.
+
+For native QA, the extracted `jftp.bat` ran from its parent directory with the Oracle JDK and an isolated English profile containing two synthetic local files. One disconnected tab opened, F1 displayed the bundled Contents topic, and Alt+F4 closed Help and then JFTP. Standard output was empty and standard error contained only the JVM's notice that it had picked up the synthetic-home option. [Disconnected tab](qa/screens/launcher-packaged-startup.jpg) · [JavaHelp Contents](qa/screens/launcher-packaged-help.jpg)
